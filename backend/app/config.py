@@ -52,14 +52,17 @@ class Settings(BaseSettings):
     def cors_origins(self) -> list[str]:
         """Get CORS origins based on environment."""
         origins = [self.frontend_url]
-        if self.is_development:
-            # Allow localhost variants in development
-            origins.extend([
-                "http://localhost:3000",
-                "http://127.0.0.1:3000",
-                "http://localhost:3001",
-            ])
-        return origins
+        
+        # Always allow these origins
+        origins.extend([
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:3001",
+            "https://arbiter-sage.vercel.app",  # Production Vercel
+        ])
+        
+        # Remove duplicates and empty strings
+        return list(set(o for o in origins if o))
 
 
 @lru_cache
