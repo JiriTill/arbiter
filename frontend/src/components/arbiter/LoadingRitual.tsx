@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, CheckCircle, BookOpen, FileText, Brain, Database, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { connectToIngestionProgress, getStageLabel, IngestionProgress } from "@/lib/sse";

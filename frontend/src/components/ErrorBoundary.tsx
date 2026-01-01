@@ -70,7 +70,7 @@ export class ErrorBoundary extends Component<Props, State> {
                     </h2>
 
                     <p className="mb-6 max-w-md text-sm text-muted-foreground">
-                        We encountered an unexpected error. This has been logged and we'll look into it.
+                        We encountered an unexpected error. This has been logged and we&apos;ll look into it.
                     </p>
 
                     {/* Error details in development */}

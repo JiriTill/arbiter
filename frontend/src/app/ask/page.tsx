@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Loader2, Send, ArrowLeft, AlertCircle, Sparkles } from "lucide-react";
+import { Loader2, Send, ArrowLeft, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -11,7 +11,6 @@ import {
     GameSelector,
     RecentQuestions,
     LoadingRitual,
-    ExpansionSelector,
     SupersededCard,
     FeedbackWidget,
     OCRWarning,

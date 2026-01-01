@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, Maximize, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -24,7 +23,6 @@ export function PDFViewer({ url, initialPage = 1, quote, gameName, sourceName }:
     const [pageNumber, setPageNumber] = useState(initialPage);
     const [scale, setScale] = useState(1.0);
     const [width, setWidth] = useState(600);
-    const [loading, setLoading] = useState(true);
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Responsive width
@@ -49,7 +47,6 @@ export function PDFViewer({ url, initialPage = 1, quote, gameName, sourceName }:
 
     function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
         setNumPages(numPages);
-        setLoading(false);
     }
 
     function changePage(offset: number) {
@@ -75,7 +72,7 @@ export function PDFViewer({ url, initialPage = 1, quote, gameName, sourceName }:
                             Look for this quote on page {initialPage}
                         </p>
                         <p className="text-sm text-gray-800 italic border-l-4 border-amber-400 pl-3 py-1 bg-white/50 rounded">
-                            "{quote}"
+                            &quot;{quote}&quot;
                         </p>
                     </div>
                 </div>

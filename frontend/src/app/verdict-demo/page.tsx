@@ -25,6 +25,7 @@ const DEMO_DATA = {
     superseded: {
         oldQuote: "Trading with the bank always requires 4 identical resource cards for 1 resource card of your choice.",
         oldPage: 8,
+        sourceType: "rulebook" as const,
         reason: "The base trading rule on page 8 is modified by the harbor rules on page 12. Players with harbor settlements get improved trading rates.",
     },
 };
@@ -53,7 +54,7 @@ export default function ComponentsDemoPage() {
                 {/* Question Context */}
                 <div className="rounded-lg border border-dashed border-border bg-card/30 p-4 text-center">
                     <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Question</p>
-                    <p className="font-medium">"Can I trade with the bank at 2:1 if I have a harbor?"</p>
+                    <p className="font-medium">&quot;Can I trade with the bank at 2:1 if I have a harbor?&quot;</p>
                     <p className="text-xs text-muted-foreground mt-1">Catan • 5th Edition</p>
                 </div>
 
@@ -80,9 +81,12 @@ export default function ComponentsDemoPage() {
 
                 {/* Superseded Card */}
                 <SupersededCard
-                    oldQuote={DEMO_DATA.superseded.oldQuote}
-                    oldPage={DEMO_DATA.superseded.oldPage}
-                    reason={DEMO_DATA.superseded.reason}
+                    supersededRule={{
+                        quote: DEMO_DATA.superseded.oldQuote,
+                        page: DEMO_DATA.superseded.oldPage,
+                        source_type: DEMO_DATA.superseded.sourceType,
+                        reason: DEMO_DATA.superseded.reason,
+                    }}
                 />
 
                 {/* Divider */}

@@ -52,7 +52,7 @@ export function QuoteCard({ quote, page, verified, className }: QuoteCardProps) 
                         fontStyle: "italic",
                     }}
                 >
-                    "{quote}"
+                    &quot;{quote}&quot;
                 </blockquote>
 
                 {/* Verified indicator */}

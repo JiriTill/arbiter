@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { cn } from "@/lib/utils";
 import { HistoryList, HistoryDetail } from "@/components/arbiter";
 import { MOCK_HISTORY, type HistoryEntry } from "@/lib/mock-history";
 

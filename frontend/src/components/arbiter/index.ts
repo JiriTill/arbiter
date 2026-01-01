@@ -14,4 +14,5 @@ export { ExpansionSelector } from "./ExpansionSelector";
 export { FeedbackWidget } from "./FeedbackWidget";
 export { OCRWarning } from "./OCRWarning";
 export { SourceSuggestionModal } from "./SourceSuggestionModal";
-export { PDFViewer } from "./PDFViewer";
+// PDFViewer should be imported dynamically with ssr: false where needed
+

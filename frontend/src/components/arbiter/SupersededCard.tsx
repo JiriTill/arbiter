@@ -121,7 +121,7 @@ export function SupersededCard({
                                     fontStyle: "italic",
                                 }}
                             >
-                                "{quote}"
+                                &quot;{quote}&quot;
                             </blockquote>
                         </div>
 
