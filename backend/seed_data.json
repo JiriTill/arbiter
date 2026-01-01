@@ -1,0 +1,114 @@
+{
+    "games": [
+        {
+            "name": "Root",
+            "slug": "root",
+            "bgg_id": 237182,
+            "cover_image_url": null,
+            "sources": [
+                {
+                    "edition": "2nd Edition",
+                    "source_type": "rulebook",
+                    "source_url": "https://ledergames.com/pages/root-resources",
+                    "is_official": true,
+                    "verified_by": "admin"
+                },
+                {
+                    "edition": "2nd Edition",
+                    "source_type": "faq",
+                    "source_url": "https://ledergames.com/pages/root-resources",
+                    "is_official": true,
+                    "verified_by": "admin"
+                }
+            ]
+        },
+        {
+            "name": "Wingspan",
+            "slug": "wingspan",
+            "bgg_id": 266192,
+            "cover_image_url": null,
+            "sources": [
+                {
+                    "edition": "2nd Printing",
+                    "source_type": "rulebook",
+                    "source_url": "https://stonemaiergames.com/games/wingspan/rules/",
+                    "is_official": true,
+                    "verified_by": "admin"
+                },
+                {
+                    "edition": "2nd Printing",
+                    "source_type": "faq",
+                    "source_url": "https://stonemaiergames.com/games/wingspan/rules/",
+                    "is_official": true,
+                    "verified_by": "admin"
+                }
+            ]
+        },
+        {
+            "name": "Catan",
+            "slug": "catan",
+            "bgg_id": 13,
+            "cover_image_url": null,
+            "sources": [
+                {
+                    "edition": "5th Edition (2015)",
+                    "source_type": "rulebook",
+                    "source_url": "https://www.catan.com/understand-catan/game-rules",
+                    "is_official": true,
+                    "verified_by": "admin"
+                },
+                {
+                    "edition": "5th Edition (2015)",
+                    "source_type": "faq",
+                    "source_url": "https://www.catan.com/understand-catan/game-rules",
+                    "is_official": true,
+                    "verified_by": "admin"
+                }
+            ]
+        },
+        {
+            "name": "Terraforming Mars",
+            "slug": "terraforming-mars",
+            "bgg_id": 167791,
+            "cover_image_url": null,
+            "sources": [
+                {
+                    "edition": "Standard Edition",
+                    "source_type": "rulebook",
+                    "source_url": "https://www.fryxgames.se/games/terraforming-mars/",
+                    "is_official": true,
+                    "verified_by": "admin"
+                },
+                {
+                    "edition": "Standard Edition",
+                    "source_type": "faq",
+                    "source_url": "https://boardgamegeek.com/wiki/page/Terraforming_Mars_FAQ",
+                    "is_official": false,
+                    "verified_by": "admin"
+                },
+                {
+                    "edition": "Standard Edition",
+                    "source_type": "errata",
+                    "source_url": "https://www.fryxgames.se/games/terraforming-mars/",
+                    "is_official": true,
+                    "verified_by": "admin"
+                }
+            ]
+        },
+        {
+            "name": "Splendor",
+            "slug": "splendor",
+            "bgg_id": 148228,
+            "cover_image_url": null,
+            "sources": [
+                {
+                    "edition": "Standard Edition",
+                    "source_type": "rulebook",
+                    "source_url": "https://cdn.1702.com/asset/2020/1/splendor-rulebook.pdf",
+                    "is_official": true,
+                    "verified_by": "admin"
+                }
+            ]
+        }
+    ]
+}
