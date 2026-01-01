@@ -118,6 +118,29 @@ async def root():
     }
 
 
+@router.get(
+    "/debug/db",
+    tags=["System"],
+    summary="Debug database connection",
+)
+async def debug_db(games_repo: GamesRepository = Depends(get_games_repo)):
+    """Debug database connection by listing games."""
+    try:
+        games = await games_repo.list_games(limit=10)
+        return {
+            "success": True, 
+            "count": len(games),
+            "database_connection": "ok",
+            "games": [{"id": g.id, "name": g.name} for g in games]
+        }
+    except Exception as e:
+        return {
+            "success": False, 
+            "database_connection": "failed",
+            "error": str(e)
+        }
+
+
 # ============================================================================
 # Ask Endpoint (Core Q&A)
 # ============================================================================

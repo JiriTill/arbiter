@@ -13,10 +13,7 @@ interface GameSelectorProps {
 }
 
 // Placeholder games for UI development (used when no games prop provided)
-const PLACEHOLDER_GAMES: Game[] = [
-    { id: 1, name: "Catan", editions: ["5th Edition"], slug: "catan", bgg_id: null, cover_image_url: null, has_indexed_sources: true },
-    { id: 2, name: "Ticket to Ride", editions: ["Europe"], slug: "ttr", bgg_id: null, cover_image_url: null, has_indexed_sources: true },
-];
+const PLACEHOLDER_GAMES: Game[] = [];
 
 export function GameSelector({ selectedGame, onSelect, games, className }: GameSelectorProps) {
     const [isOpen, setIsOpen] = useState(false);

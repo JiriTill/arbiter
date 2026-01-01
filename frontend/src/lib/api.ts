@@ -59,7 +59,10 @@ export async function apiRequest<T>(
     endpoint: string,
     options: RequestInit = {}
 ): Promise<T> {
-    const url = `${API_BASE_URL}${endpoint}`;
+    // Ensure endpoint starts with / and base doesn't end with /
+    const cleanBase = API_BASE_URL.replace(/\/$/, "");
+    const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+    const url = `${cleanBase}${cleanEndpoint}`;
 
     const response = await fetch(url, {
         headers: {
