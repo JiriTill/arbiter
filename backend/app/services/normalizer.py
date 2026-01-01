@@ -3,7 +3,22 @@ Question normalization logic for intelligent caching.
 """
 
 import re
-from nltk.stem import WordNetLemmatizer
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Try to download NLTK data at module load
+try:
+    import nltk
+    nltk.download('wordnet', quiet=True)
+    nltk.download('omw-1.4', quiet=True)
+    from nltk.stem import WordNetLemmatizer
+    _lemmatizer = WordNetLemmatizer()
+    NLTK_AVAILABLE = True
+except Exception as e:
+    logger.warning(f"NLTK not available, skipping lemmatization: {e}")
+    _lemmatizer = None
+    NLTK_AVAILABLE = False
 
 
 def normalize_question(q: str) -> str:
@@ -15,7 +30,7 @@ def normalize_question(q: str) -> str:
     2. Remove punctuation
     3. Collapse whitespace
     4. Convert number words to digits
-    5. Lemmatize words
+    5. Lemmatize words (if NLTK available)
     """
     if not q:
         return ""
@@ -38,10 +53,14 @@ def normalize_question(q: str) -> str:
     for word, digit in number_map.items():
         q = re.sub(r'\b' + word + r'\b', digit, q)
     
-    # Lemmatize (convert words to base form)
-    # Note: Requires nltk.download('wordnet') and nltk.download('omw-1.4')
-    lemmatizer = WordNetLemmatizer()
-    words = q.split()
-    words = [lemmatizer.lemmatize(w) for w in words]
+    # Lemmatize (convert words to base form) - skip if NLTK not available
+    if NLTK_AVAILABLE and _lemmatizer:
+        try:
+            words = q.split()
+            words = [_lemmatizer.lemmatize(w) for w in words]
+            q = ' '.join(words)
+        except Exception as e:
+            logger.warning(f"Lemmatization failed: {e}")
     
-    return ' '.join(words)
+    return q
+
