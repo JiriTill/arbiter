@@ -161,11 +161,16 @@ export default function AdminPage() {
                 throw new Error(err.detail || "Failed to start processing");
             }
 
+            const data = await res.json();
+
             // Refresh games to update status
             fetchGames();
+
+            return data.job_id;
         } catch (err) {
             console.error("Processing trigger failed:", err);
             alert("Failed to start processing. Check console for details.");
+            return null;
         }
     };
 
@@ -495,12 +500,15 @@ export default function AdminPage() {
     );
 }
 
-function SourceRow({ source, onProcess }: { source: Source; onProcess: () => void }) {
+function SourceRow({ source, onProcess }: { source: Source; onProcess: () => Promise<string | null> }) {
     const [status, setStatus] = useState<{
         status: string;
         needs_ocr: boolean;
         last_ingested_at: string | null;
     } | null>(null);
+    const [jobId, setJobId] = useState<string | null>(null);
+    const [progress, setProgress] = useState<number>(0);
+    const [progressMessage, setProgressMessage] = useState<string>("");
     const [processing, setProcessing] = useState(false);
 
     // Initial status from props
@@ -512,42 +520,89 @@ function SourceRow({ source, onProcess }: { source: Source; onProcess: () => voi
         });
     }, [source]);
 
-    // Poll for status if processing or pending
+    // Poll Job Status (if we have a job ID)
     useEffect(() => {
-        if (!status || status.status === "indexed") return;
+        if (!jobId) return;
+
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/ingest/${jobId}/status`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setProgress(data.pct || 0);
+                    setProgressMessage(data.message || "");
+
+                    if (data.state === "ready" || data.state === "failed") {
+                        setJobId(null); // Stop job polling
+                        setProcessing(false);
+                        // Trigger final source status check
+                        const sourceRes = await fetch(`${API_BASE_URL}/admin/sources/${source.id}/status`);
+                        if (sourceRes.ok) {
+                            const sourceData = await sourceRes.json();
+                            setStatus(sourceData);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Job poll failed", e);
+            }
+        }, 2000);
+
+        return () => clearInterval(interval);
+    }, [jobId, source.id]);
+
+    // Poll Source Status (fallback if no job ID but pending)
+    useEffect(() => {
+        if (jobId || !status || status.status === "indexed") return;
+
+        // Only poll if marked as pending/processing but we don't have a local job ID
+        // (e.g. page refresh)
+        if (status.status !== "pending" && !processing) return;
 
         const interval = setInterval(async () => {
             try {
                 const res = await fetch(`${API_BASE_URL}/admin/sources/${source.id}/status`);
                 if (res.ok) {
                     const data = await res.json();
-                    setStatus({
-                        status: data.status,
-                        needs_ocr: data.needs_ocr,
-                        last_ingested_at: data.last_ingested_at,
-                    });
+                    setStatus(data);
 
-                    // Stop polling if indexed
                     if (data.status === "indexed") {
                         setProcessing(false);
                         clearInterval(interval);
                     }
                 }
             } catch (e) {
-                console.error("Failed to poll status", e);
+                // Silent fail on polling errors
             }
-        }, 5000); // Poll every 5 seconds
+        }, 5000);
 
         return () => clearInterval(interval);
-    }, [source.id, status]);
+    }, [source.id, status, jobId, processing]);
+
+    const handleStartProcess = async () => {
+        setProcessing(true);
+        const newJobId = await onProcess();
+        if (newJobId) {
+            setJobId(newJobId);
+        } else {
+            setProcessing(false);
+        }
+    };
 
     const displayStatus = () => {
-        if (processing) return <span className="text-blue-500 animate-pulse">🔄 Starting...</span>;
+        if (jobId) return (
+            <span className="text-blue-500 animate-pulse text-xs">
+                {progress}% - {progressMessage.substring(0, 30)}...
+            </span>
+        );
+
+        if (processing && !jobId) return <span className="text-blue-500 animate-pulse">🔄 Starting...</span>;
+
         if (!status) return <span className="text-muted-foreground">...</span>;
 
         if (status.status === "indexed") return <span className="text-green-500">✅ Indexed</span>;
         if (status.status === "needs_ocr") return <span className="text-orange-500">📄 Needs OCR</span>;
-        if (status.status === "pending") return <span className="text-yellow-500 animate-pulse">⏳ Processing...</span>;
+        if (status.status === "pending") return <span className="text-yellow-500 animate-pulse">⏳ Queued...</span>;
         return <span className="text-muted-foreground">{status.status}</span>;
     };
 
@@ -561,18 +616,15 @@ function SourceRow({ source, onProcess }: { source: Source; onProcess: () => voi
             <div className="flex items-center gap-3">
                 {displayStatus()}
 
-                {status?.needs_ocr && (
+                {status?.needs_ocr && !processing && (
                     <span className="text-xs bg-orange-500/20 text-orange-500 px-2 py-0.5 rounded border border-orange-500/30">
                         OCR Required
                     </span>
                 )}
 
-                {(!status?.last_ingested_at) && (
+                {(!status?.last_ingested_at) && !jobId && (
                     <button
-                        onClick={() => {
-                            setProcessing(true);
-                            onProcess();
-                        }}
+                        onClick={handleStartProcess}
                         disabled={processing || status?.status === "pending"}
                         className="px-3 py-1 bg-primary text-primary-foreground text-xs rounded hover:opacity-90 disabled:opacity-50 transition"
                     >
@@ -583,3 +635,4 @@ function SourceRow({ source, onProcess }: { source: Source; onProcess: () => voi
         </div>
     );
 }
+
