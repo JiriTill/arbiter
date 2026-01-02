@@ -205,6 +205,15 @@ class SourcesRepository(BaseRepository[GameSource, GameSourceCreate]):
                 updated_at=row["updated_at"],
                 **suggestion.model_dump()
             )
+
+    async def delete_source(self, source_id: int) -> bool:
+        """Delete a source."""
+        query = "DELETE FROM game_sources WHERE id = %s RETURNING id"
+        async with self._get_cursor() as cur:
+            await cur.execute(query, (source_id,))
+            result = await cur.fetchone()
+            await self.conn.commit()
+            return result is not None
     
     # ========================================================================
     # Sync Methods (for background jobs)

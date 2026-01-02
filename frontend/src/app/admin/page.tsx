@@ -179,7 +179,11 @@ export default function AdminPage() {
         try {
             const res = await fetch(`${API_BASE_URL}/admin/maintenance/fix-images`, { method: "POST" });
             const data = await res.json();
-            alert(data.message);
+            if (data.debug && data.debug.length > 0) {
+                alert(`${data.message}\n\nDetails:\n${data.debug.join('\n')}`);
+            } else {
+                alert(data.message);
+            }
             fetchGames();
         } catch (e) {
             alert("Failed to fix images");

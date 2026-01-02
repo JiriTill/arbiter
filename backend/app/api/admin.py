@@ -342,27 +342,43 @@ async def fix_game_images():
     count = 0
     from app.db.connection import get_async_connection
     
+    debug_info = []
+    
     async with get_async_connection() as conn:
         async with conn.cursor() as cur:
-            await cur.execute("SELECT id, cover_image_url FROM games WHERE cover_image_url LIKE '%filters:%'")
+            # Broader search: any URL containing /fit-in/
+            await cur.execute("SELECT id, name, cover_image_url FROM games WHERE cover_image_url LIKE '%/fit-in/%'")
             rows = await cur.fetchall()
             
+            debug_info.append(f"Found {len(rows)} games with /fit-in/ URLs")
+            
             for row in rows:
-                game_id, url = row
-                if "/fit-in" in url and "/pic" in url:
-                    base_part = url.split("/fit-in")[0]
-                    filename = url.split("/")[-1]
-                    new_url = f"{base_part}/{filename}"
-                    
-                    await cur.execute(
-                        "UPDATE games SET cover_image_url = %s WHERE id = %s",
-                        (new_url, game_id)
-                    )
-                    count += 1
+                game_id, name, url = row
+                if "/fit-in/" in url and "/pic" in url:
+                    try:
+                        # Extract base path and filename
+                        base_part = url.split("/fit-in/")[0]
+                        filename = url.split("/")[-1]
+                        new_url = f"{base_part}/{filename}"
+                        
+                        debug_info.append(f"Fixing {name}: .../{url.split('/')[-1]} -> {new_url.split('/')[-1]}")
+                        
+                        await cur.execute(
+                            "UPDATE games SET cover_image_url = %s WHERE id = %s",
+                            (new_url, game_id)
+                        )
+                        count += 1
+                    except Exception as e:
+                        debug_info.append(f"Error fixing {name}: {e}")
             
             await conn.commit()
             
-    return {"success": True, "fixed_count": count, "message": f"Fixed {count} image URLs"}
+    return {
+        "success": True, 
+        "fixed_count": count, 
+        "message": f"Fixed {count} image URLs",
+        "debug": debug_info
+    }
 
 
 
