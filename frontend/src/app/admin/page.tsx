@@ -128,8 +128,12 @@ export default function AdminPage() {
             const result = await res.json();
             setUploadProgress(`✅ Uploaded! ${result.file_size_mb} MB. Source ID: ${result.source.id}`);
 
-            // Trigger ingestion
-            setUploadProgress("Starting ingestion...");
+            // Trigger processing immediately if needed
+            if (uploadData.needs_ocr) {
+                setUploadProgress("Triggering OCR processing...");
+                await handleProcess(result.source.id);
+                setUploadProgress("✅ Uploaded & Processing started!");
+            }
 
             // Reset form after delay
             setTimeout(() => {
@@ -143,6 +147,25 @@ export default function AdminPage() {
             setUploadProgress(`❌ Error: ${err instanceof Error ? err.message : "Upload failed"}`);
         } finally {
             setUploading(false);
+        }
+    };
+
+    const handleProcess = async (sourceId: number) => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/admin/sources/${sourceId}/process`, {
+                method: "POST",
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || "Failed to start processing");
+            }
+
+            // Refresh games to update status
+            fetchGames();
+        } catch (err) {
+            console.error("Processing trigger failed:", err);
+            alert("Failed to start processing. Check console for details.");
         }
     };
 
@@ -448,23 +471,11 @@ export default function AdminPage() {
                                 {selectedGameId === game.id && game.sources && game.sources.length > 0 && (
                                     <div className="mt-4 pl-20 space-y-2">
                                         {game.sources.map((source) => (
-                                            <div
+                                            <SourceRow
                                                 key={source.id}
-                                                className="flex items-center gap-3 text-sm p-2 bg-muted/30 rounded-lg"
-                                            >
-                                                <span className="text-muted-foreground">📄</span>
-                                                <span className="flex-1">
-                                                    {source.edition} - {source.source_type}
-                                                </span>
-                                                <span className={source.last_ingested_at ? "text-green-500" : "text-yellow-500"}>
-                                                    {source.last_ingested_at ? "✅ Indexed" : "⏳ Pending"}
-                                                </span>
-                                                {source.needs_ocr && (
-                                                    <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded">
-                                                        OCR
-                                                    </span>
-                                                )}
-                                            </div>
+                                                source={source}
+                                                onProcess={() => handleProcess(source.id)}
+                                            />
                                         ))}
                                     </div>
                                 )}
@@ -478,6 +489,95 @@ export default function AdminPage() {
                         )}
                     </div>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+function SourceRow({ source, onProcess }: { source: Source; onProcess: () => void }) {
+    const [status, setStatus] = useState<{
+        status: string;
+        needs_ocr: boolean;
+        last_ingested_at: string | null;
+    } | null>(null);
+    const [processing, setProcessing] = useState(false);
+
+    // Initial status from props
+    useEffect(() => {
+        setStatus({
+            status: source.last_ingested_at ? "indexed" : source.needs_ocr ? "needs_ocr" : "pending",
+            needs_ocr: source.needs_ocr,
+            last_ingested_at: source.last_ingested_at,
+        });
+    }, [source]);
+
+    // Poll for status if processing or pending
+    useEffect(() => {
+        if (!status || status.status === "indexed") return;
+
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/admin/sources/${source.id}/status`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setStatus({
+                        status: data.status,
+                        needs_ocr: data.needs_ocr,
+                        last_ingested_at: data.last_ingested_at,
+                    });
+
+                    // Stop polling if indexed
+                    if (data.status === "indexed") {
+                        setProcessing(false);
+                        clearInterval(interval);
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to poll status", e);
+            }
+        }, 5000); // Poll every 5 seconds
+
+        return () => clearInterval(interval);
+    }, [source.id, status]);
+
+    const displayStatus = () => {
+        if (processing) return <span className="text-blue-500 animate-pulse">🔄 Starting...</span>;
+        if (!status) return <span className="text-muted-foreground">...</span>;
+
+        if (status.status === "indexed") return <span className="text-green-500">✅ Indexed</span>;
+        if (status.status === "needs_ocr") return <span className="text-orange-500">📄 Needs OCR</span>;
+        if (status.status === "pending") return <span className="text-yellow-500 animate-pulse">⏳ Processing...</span>;
+        return <span className="text-muted-foreground">{status.status}</span>;
+    };
+
+    return (
+        <div className="flex items-center gap-3 text-sm p-2 bg-muted/30 rounded-lg group">
+            <span className="text-muted-foreground">📄</span>
+            <span className="flex-1 font-medium">
+                {source.edition} - {source.source_type}
+            </span>
+
+            <div className="flex items-center gap-3">
+                {displayStatus()}
+
+                {status?.needs_ocr && (
+                    <span className="text-xs bg-orange-500/20 text-orange-500 px-2 py-0.5 rounded border border-orange-500/30">
+                        OCR Required
+                    </span>
+                )}
+
+                {(!status?.last_ingested_at) && (
+                    <button
+                        onClick={() => {
+                            setProcessing(true);
+                            onProcess();
+                        }}
+                        disabled={processing || status?.status === "pending"}
+                        className="px-3 py-1 bg-primary text-primary-foreground text-xs rounded hover:opacity-90 disabled:opacity-50 transition"
+                    >
+                        {processing ? "Starting..." : "Process Now"}
+                    </button>
+                )}
             </div>
         </div>
     );

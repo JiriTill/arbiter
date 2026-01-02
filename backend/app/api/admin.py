@@ -236,6 +236,79 @@ async def trigger_reingest(
     return {"success": True, "message": f"Source {source_id} marked for re-ingestion"}
 
 
+@router.post("/sources/{source_id}/process")
+async def start_processing(
+    source_id: int,
+    force: bool = False,
+    sources_repo: SourcesRepository = Depends(get_sources_repo),
+) -> dict[str, Any]:
+    """
+    Immediately start processing a source in the background.
+    
+    This triggers ingestion (including OCR for scanned PDFs) without
+    waiting for a user question. Useful for pre-processing uploaded PDFs.
+    """
+    from app.jobs import enqueue_ingestion
+    
+    try:
+        # Reset the needs_ocr flag so processing actually happens
+        # (otherwise it might skip because it was marked as needing OCR)
+        source = await sources_repo.get_source(source_id)
+        if not source:
+            raise HTTPException(status_code=404, detail="Source not found")
+        
+        # Clear the needs_ocr flag and mark for reingest
+        await sources_repo.mark_needs_reingest(source_id)
+        
+        # Enqueue the ingestion job
+        job_id = enqueue_ingestion(source_id, force=True)
+        
+        return {
+            "success": True,
+            "job_id": job_id,
+            "source_id": source_id,
+            "message": f"Processing started for source {source_id}",
+            "status_url": f"/ingest/{job_id}/status",
+            "note": "OCR processing may take 10-20 minutes for large scanned PDFs",
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to start processing: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start processing: {str(e)}")
+
+
+@router.get("/sources/{source_id}/status")
+async def get_source_status(
+    source_id: int,
+    sources_repo: SourcesRepository = Depends(get_sources_repo),
+) -> dict[str, Any]:
+    """Get the processing status of a source."""
+    source = await sources_repo.get_source(source_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    
+    status = "unknown"
+    if source.last_ingested_at:
+        status = "indexed"
+    elif source.needs_ocr:
+        status = "needs_ocr"
+    elif source.needs_reingest:
+        status = "pending"
+    else:
+        status = "not_started"
+    
+    return {
+        "source_id": source_id,
+        "status": status,
+        "needs_ocr": source.needs_ocr,
+        "needs_reingest": source.needs_reingest,
+        "last_ingested_at": source.last_ingested_at.isoformat() if source.last_ingested_at else None,
+    }
+
+
+
 # =============================================================================
 # Feedback & Costs (existing)
 # =============================================================================
