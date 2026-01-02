@@ -41,30 +41,33 @@ class ChunksRepository(BaseRepository[RuleChunk, RuleChunkCreate]):
         """
         # Build the query with optional filters
         conditions = ["rc.embedding IS NOT NULL"]
-        params: list = []
+        condition_params: list = []
         
         if game_id is not None:
             conditions.append("gs.game_id = %s")
-            params.append(game_id)
+            condition_params.append(game_id)
         
         if source_ids:
             placeholders = ", ".join(["%s"] * len(source_ids))
             conditions.append(f"rc.source_id IN ({placeholders})")
-            params.extend(source_ids)
+            condition_params.extend(source_ids)
         
         # Filter out expired chunks
         conditions.append("(rc.expires_at IS NULL OR rc.expires_at > NOW())")
         
         where_clause = " AND ".join(conditions)
         
-        # Add embedding and limit params
-        # Note: embedding is used 3 times in the query (SELECT, WHERE, ORDER BY)
+        # Build embedding string
         embedding_str = "[" + ",".join(map(str, embedding)) + "]"
-        params.append(embedding_str)  # For SELECT similarity calc
-        params.append(embedding_str)  # For WHERE filter
-        params.append(min_similarity)
-        params.append(embedding_str)  # For ORDER BY
-        params.append(limit)
+        
+        # Build params in EXACT order they appear in SQL:
+        # 1. embedding (SELECT - line 72)
+        # 2. condition_params (WHERE filters)
+        # 3. embedding (WHERE similarity filter - line 79)
+        # 4. min_similarity (line 79)
+        # 5. embedding (ORDER BY - line 80)
+        # 6. limit (line 81)
+        params = [embedding_str] + condition_params + [embedding_str, min_similarity, embedding_str, limit]
         
         query = f"""
             SELECT 
