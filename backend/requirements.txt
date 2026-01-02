@@ -21,6 +21,11 @@ openai>=1.10.0
 # PDF Processing
 pymupdf>=1.23.0
 
+# OCR for scanned PDFs
+pytesseract>=0.3.10
+pdf2image>=1.16.0
+Pillow>=10.0.0
+
 # Background Jobs
 redis>=5.0.0
 rq>=1.15.0

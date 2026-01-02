@@ -1,0 +1,8 @@
+# Nixpacks configuration for Railway deployment
+# Installs system dependencies needed for OCR
+
+[phases.setup]
+nixPkgs = ["tesseract", "poppler_utils"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]

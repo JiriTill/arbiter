@@ -263,3 +263,12 @@ async def get_costs(
     """Get API cost statistics. Period can be 'today', 'week', 'month'."""
     return await costs_repo.get_stats(period)
 
+
+@router.get("/ocr/status")
+async def get_ocr_status():
+    """Check if OCR is available on the server."""
+    try:
+        from app.services.ocr import check_tesseract_installation
+        return check_tesseract_installation()
+    except Exception as e:
+        return {"installed": False, "error": str(e)}

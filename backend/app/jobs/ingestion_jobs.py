@@ -101,17 +101,66 @@ def ingest_source_job(source_id: int, force: bool = False) -> dict[str, Any]:
         
         # Check if needs OCR
         if detect_needs_ocr(pages, total_page_count):
-            with get_sync_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        "UPDATE game_sources SET needs_ocr = TRUE, file_hash = %s, updated_at = NOW() WHERE id = %s",
-                        (file_hash, source_id)
-                    )
-                    conn.commit()
+            logger.info(f"PDF needs OCR - attempting OCR extraction...")
+            set_job_status(job_id, "ocr", 52, "Scanned PDF detected - running OCR (this may take a while)...")
             
-            set_job_status(job_id, "ready", 100, "PDF needs OCR - manual processing required", 
-                          result={"status": "needs_ocr"})
-            return {"status": "needs_ocr", "pages": total_page_count, "chars": total_chars}
+            try:
+                from app.services.ocr import ocr_pdf_bytes, is_ocr_available
+                
+                if not is_ocr_available():
+                    logger.error("OCR not available - pytesseract not installed")
+                    with get_sync_connection() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute(
+                                "UPDATE game_sources SET needs_ocr = TRUE, file_hash = %s, updated_at = NOW() WHERE id = %s",
+                                (file_hash, source_id)
+                            )
+                            conn.commit()
+                    set_job_status(job_id, "failed", 52, "OCR not available on server", error="OCR not available")
+                    return {"status": "needs_ocr", "error": "OCR not available"}
+                
+                # Run OCR on the PDF
+                set_job_status(job_id, "ocr", 55, f"Running OCR on {total_page_count} pages...")
+                pages = ocr_pdf_bytes(pdf_bytes, dpi=200)
+                total_chars = sum(len(text) for _, text in pages)
+                
+                if not pages or total_chars < 100:
+                    logger.error(f"OCR failed to extract text: {total_chars} chars from {len(pages)} pages")
+                    with get_sync_connection() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute(
+                                "UPDATE game_sources SET needs_ocr = TRUE, file_hash = %s, updated_at = NOW() WHERE id = %s",
+                                (file_hash, source_id)
+                            )
+                            conn.commit()
+                    set_job_status(job_id, "failed", 55, "OCR extraction failed", error="OCR extracted no text")
+                    return {"status": "ocr_failed", "error": "OCR extracted no text"}
+                
+                logger.info(f"OCR successful: {len(pages)} pages, {total_chars} chars")
+                set_job_status(job_id, "ocr", 60, f"OCR complete: {total_chars:,} chars from {len(pages)} pages")
+                
+            except ImportError as e:
+                logger.error(f"OCR libraries not installed: {e}")
+                with get_sync_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "UPDATE game_sources SET needs_ocr = TRUE, file_hash = %s, updated_at = NOW() WHERE id = %s",
+                            (file_hash, source_id)
+                        )
+                        conn.commit()
+                set_job_status(job_id, "failed", 52, "OCR libraries not installed", error=str(e))
+                return {"status": "needs_ocr", "error": str(e)}
+            except Exception as e:
+                logger.error(f"OCR failed: {e}")
+                with get_sync_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "UPDATE game_sources SET needs_ocr = TRUE, file_hash = %s, updated_at = NOW() WHERE id = %s",
+                            (file_hash, source_id)
+                        )
+                        conn.commit()
+                set_job_status(job_id, "failed", 55, f"OCR failed: {e}", error=str(e))
+                return {"status": "ocr_failed", "error": str(e)}
         
         # Stage 4: Chunking (50-60%)
         set_job_status(job_id, "chunking", 55, "Splitting text into chunks...")
