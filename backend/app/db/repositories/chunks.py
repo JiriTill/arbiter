@@ -58,9 +58,12 @@ class ChunksRepository(BaseRepository[RuleChunk, RuleChunkCreate]):
         where_clause = " AND ".join(conditions)
         
         # Add embedding and limit params
+        # Note: embedding is used 3 times in the query (SELECT, WHERE, ORDER BY)
         embedding_str = "[" + ",".join(map(str, embedding)) + "]"
-        params.append(embedding_str)
+        params.append(embedding_str)  # For SELECT similarity calc
+        params.append(embedding_str)  # For WHERE filter
         params.append(min_similarity)
+        params.append(embedding_str)  # For ORDER BY
         params.append(limit)
         
         query = f"""
@@ -77,9 +80,6 @@ class ChunksRepository(BaseRepository[RuleChunk, RuleChunkCreate]):
             ORDER BY rc.embedding <=> %s::vector
             LIMIT %s
         """
-        
-        # Add embedding again for ORDER BY
-        params.insert(-1, embedding_str)
         
         async with self._get_cursor() as cur:
             await cur.execute(query, tuple(params))
