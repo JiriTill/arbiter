@@ -381,6 +381,17 @@ async def fix_game_images():
     }
 
 
+@router.get("/maintenance/urls")
+async def get_image_urls():
+    """Get all game image URLs for debugging."""
+    from app.db.connection import get_async_connection
+    async with get_async_connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT id, name, cover_image_url FROM games")
+            rows = await cur.fetchall()
+            return [{"id": r[0], "name": r[1], "url": r[2]} for r in rows]
+
+
 
 # =============================================================================
 # Feedback & Costs (existing)

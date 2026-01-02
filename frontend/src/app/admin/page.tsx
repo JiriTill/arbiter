@@ -174,6 +174,17 @@ export default function AdminPage() {
         }
     };
 
+    const handleDebugUrls = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/admin/maintenance/urls`);
+            const data = await res.json();
+            const msg = data.map((g: any) => `${g.name}: ${g.url}`).join('\n\n');
+            alert(msg);
+        } catch (e) {
+            alert("Failed to fetch URLs");
+        }
+    };
+
     const handleFixImages = async () => {
         if (!confirm("Start fixing broken BGG images?")) return;
         try {
@@ -227,6 +238,12 @@ export default function AdminPage() {
                         <p className="text-muted-foreground mt-1">Manage games and rulebooks</p>
                     </div>
                     <div className="flex gap-2">
+                        <button
+                            onClick={handleDebugUrls}
+                            className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg flex items-center gap-2 transition"
+                        >
+                            📋 Debug URLs
+                        </button>
                         <button
                             onClick={handleFixImages}
                             className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg flex items-center gap-2 transition"
@@ -545,14 +562,17 @@ function SourceRow({ source, onProcess, onDelete }: { source: Source; onProcess:
     const [processing, setProcessing] = useState(false);
     const [deleting, setDeleting] = useState(false);
 
-    // Initial status from props
+    // Initial status from props, but careful not to overwrite if processing locally
     useEffect(() => {
-        setStatus({
-            status: source.last_ingested_at ? "indexed" : source.needs_ocr ? "needs_ocr" : "pending",
-            needs_ocr: source.needs_ocr,
-            last_ingested_at: source.last_ingested_at,
-        });
-    }, [source]);
+        // Only update if we are NOT currently processing a job we know about
+        if (!processing) {
+            setStatus({
+                status: source.last_ingested_at ? "indexed" : source.needs_ocr ? "needs_ocr" : "pending",
+                needs_ocr: source.needs_ocr,
+                last_ingested_at: source.last_ingested_at,
+            });
+        }
+    }, [source, processing]);
 
     // Poll Job Status (if we have a job ID)
     useEffect(() => {
@@ -563,34 +583,31 @@ function SourceRow({ source, onProcess, onDelete }: { source: Source; onProcess:
                 const res = await fetch(`${API_BASE_URL}/ingest/${jobId}/status`);
                 if (res.ok) {
                     const data = await res.json();
+                    console.log("Job status:", data);
                     setProgress(data.pct || 0);
                     setProgressMessage(data.message || "");
 
                     if (data.state === "ready" || data.state === "failed") {
-                        setJobId(null); // Stop job polling
+                        setJobId(null);
                         setProcessing(false);
-                        // Trigger final source status check
+                        // Trigger final update
                         const sourceRes = await fetch(`${API_BASE_URL}/admin/sources/${source.id}/status`);
                         if (sourceRes.ok) {
-                            const sourceData = await sourceRes.json();
-                            setStatus(sourceData);
+                            setStatus(await sourceRes.json());
                         }
                     }
                 }
             } catch (e) {
                 console.error("Job poll failed", e);
             }
-        }, 2000);
+        }, 1000); // Faster polling
 
         return () => clearInterval(interval);
     }, [jobId, source.id]);
 
-    // Poll Source Status (fallback if no job ID but pending)
+    // Poll Source Status (fallback) - kept but slower
     useEffect(() => {
         if (jobId || !status || status.status === "indexed") return;
-
-        // Only poll if marked as pending/processing but we don't have a local job ID
-        // (e.g. page refresh)
         if (status.status !== "pending" && !processing) return;
 
         const interval = setInterval(async () => {
@@ -598,27 +615,27 @@ function SourceRow({ source, onProcess, onDelete }: { source: Source; onProcess:
                 const res = await fetch(`${API_BASE_URL}/admin/sources/${source.id}/status`);
                 if (res.ok) {
                     const data = await res.json();
-                    setStatus(data);
+                    if (!processing) setStatus(data); // Don't overwrite if local processing active
 
                     if (data.status === "indexed") {
                         setProcessing(false);
                         clearInterval(interval);
                     }
                 }
-            } catch (e) {
-                // Silent fail on polling errors
-            }
+            } catch (e) { }
         }, 5000);
-
         return () => clearInterval(interval);
     }, [source.id, status, jobId, processing]);
 
     const handleStartProcess = async () => {
         setProcessing(true);
+        console.log("Starting processing...");
         const newJobId = await onProcess();
+        console.log("Job ID:", newJobId);
         if (newJobId) {
             setJobId(newJobId);
         } else {
+            console.error("No job ID returned");
             setProcessing(false);
         }
     };
@@ -632,12 +649,12 @@ function SourceRow({ source, onProcess, onDelete }: { source: Source; onProcess:
 
     const displayStatus = () => {
         if (jobId) return (
-            <span className="text-blue-500 animate-pulse text-xs">
-                {progress}% - {progressMessage.substring(0, 30)}...
+            <span className="text-blue-500 animate-pulse text-xs font-mono ml-2">
+                {progress}% {progressMessage && `- ${progressMessage.substring(0, 20)}...`}
             </span>
         );
 
-        if (processing && !jobId) return <span className="text-blue-500 animate-pulse">🔄 Starting...</span>;
+        if (processing && !jobId) return <span className="text-blue-500 animate-pulse">🔄 Requesting...</span>;
 
         if (!status) return <span className="text-muted-foreground">...</span>;
 
