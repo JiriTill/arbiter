@@ -393,6 +393,31 @@ async def get_image_urls():
 
 
 
+@router.post("/maintenance/reset-images")
+async def reset_game_images():
+    """Reset images to known good Clean URLs from seed data."""
+    # Maps Name -> Clean URL (with hash, no fit-in)
+    updates = {
+        "Root": "https://cf.geekdo-images.com/JUAUWaVUzeBgzirhZNmHHw__imagepage/img/ZF-dta5ffawuKAkAt2LB-QTIv5M=/pic4254509.jpg",
+        "Wingspan": "https://cf.geekdo-images.com/yLZJCVLlIx4c7eJEWUNJ7w__imagepage/img/uIjeoKgHMcRtzRSR4MoUYl3nXxs=/pic4458123.jpg",
+        "Catan": "https://cf.geekdo-images.com/W3Bsga_uLP9kO91gZ7H8yw__imagepage/img/M_3Vg1j2HlNgkv7PL2xl2BJE2bw=/pic2419375.jpg",
+        "Terraforming Mars": "https://cf.geekdo-images.com/wg9oOLcsKvDesSUdZQ4rxw__imagepage/img/FS1RE8Ue6nk1pNbPI3l-OSapQGc=/pic3536616.jpg",
+        "Splendor": "https://cf.geekdo-images.com/rwOMxx4q5yuElIvo-1-OFw__imagepage/img/qXpYXfJzT21tELMbG3V8WQio8z8=/pic1904079.jpg"
+    }
+    
+    count = 0
+    from app.db.connection import get_async_connection
+    async with get_async_connection() as conn:
+        async with conn.cursor() as cur:
+            for name, url in updates.items():
+                await cur.execute("UPDATE games SET cover_image_url = %s WHERE name = %s", (url, name))
+                if cur.rowcount > 0:
+                    count += 1
+            await conn.commit()
+            
+    return {"success": True, "message": f"Reset {count} games to known good URLs"}
+
+
 # =============================================================================
 # Feedback & Costs (existing)
 # =============================================================================

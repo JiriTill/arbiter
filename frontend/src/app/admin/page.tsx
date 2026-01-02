@@ -168,10 +168,16 @@ export default function AdminPage() {
 
             return data.job_id;
         } catch (err) {
-            console.error("Processing trigger failed:", err);
-            alert("Failed to start processing. Check console for details.");
+            addLog(`Processing trigger failed for source ${sourceId}: ${err instanceof Error ? err.message : "Unknown error"}`);
             return null;
         }
+    };
+
+    const [logs, setLogs] = useState<string[]>([]);
+
+    const addLog = (msg: string) => {
+        setLogs(prev => [`[${new Date().toISOString().split('T')[1].split('.')[0]}] ${msg}`, ...prev].slice(0, 50));
+        console.log(msg); // Also real console
     };
 
     const handleDebugUrls = async () => {
@@ -179,25 +185,21 @@ export default function AdminPage() {
             const res = await fetch(`${API_BASE_URL}/admin/maintenance/urls`);
             const data = await res.json();
             const msg = data.map((g: any) => `${g.name}: ${g.url}`).join('\n\n');
-            alert(msg);
+            addLog(`Debug URLs:\n${msg}`);
         } catch (e) {
-            alert("Failed to fetch URLs");
+            addLog("Failed to fetch URLs");
         }
     };
 
     const handleFixImages = async () => {
-        if (!confirm("Start fixing broken BGG images?")) return;
+        if (!confirm("RESET images to original Seed Data URLs? (This fixes '400 Bad Request' errors)")) return;
         try {
-            const res = await fetch(`${API_BASE_URL}/admin/maintenance/fix-images`, { method: "POST" });
+            const res = await fetch(`${API_BASE_URL}/admin/maintenance/reset-images`, { method: "POST" });
             const data = await res.json();
-            if (data.debug && data.debug.length > 0) {
-                alert(`${data.message}\n\nDetails:\n${data.debug.join('\n')}`);
-            } else {
-                alert(data.message);
-            }
+            addLog(data.message);
             fetchGames();
         } catch (e) {
-            alert("Failed to fix images");
+            addLog("Failed to reset images");
         }
     };
 
@@ -531,6 +533,7 @@ export default function AdminPage() {
                                                 source={source}
                                                 onProcess={() => handleProcess(source.id)}
                                                 onDelete={() => handleDeleteSource(source.id)}
+                                                onLog={addLog}
                                             />
                                         ))}
                                     </div>
@@ -546,11 +549,27 @@ export default function AdminPage() {
                     </div>
                 </div>
             </div>
+
+            {/* System Logs Panel */}
+            <div className="fixed bottom-16 left-0 right-0 bg-black/95 text-green-400 text-xs font-mono p-2 h-32 overflow-y-auto border-t border-green-500/30 z-40 shadow-lg">
+                <div className="max-w-6xl mx-auto px-6">
+                    <div className="flex justify-between items-center mb-1 sticky top-0 bg-black/50 backdrop-blur w-full">
+                        <span className="font-bold">SYSTEM LOGS</span>
+                        <button onClick={() => setLogs([])} className="text-[10px] text-gray-500 hover:text-white">CLEAR</button>
+                    </div>
+                    <div className="space-y-0.5">
+                        {logs.length === 0 && <div className="text-gray-600 italic">Ready. Logs will appear here...</div>}
+                        {logs.map((log, i) => (
+                            <div key={i} className="whitespace-pre-wrap font-mono">{log}</div>
+                        ))}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
 
-function SourceRow({ source, onProcess, onDelete }: { source: Source; onProcess: () => Promise<string | null>; onDelete: () => void }) {
+function SourceRow({ source, onProcess, onDelete, onLog }: { source: Source; onProcess: () => Promise<string | null>; onDelete: () => void; onLog: (msg: string) => void }) {
     const [status, setStatus] = useState<{
         status: string;
         needs_ocr: boolean;
