@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 # Storage bucket name for rulebooks
-STORAGE_BUCKET = "rulebooks"
+STORAGE_BUCKET = "Rulebooks"
 
 
 def get_supabase_client() -> Client:
