@@ -442,6 +442,7 @@ export default function AdminPage() {
                                         <img
                                             src={game.cover_image_url}
                                             alt={game.name}
+                                            referrerPolicy="no-referrer"
                                             className="w-16 h-16 object-cover rounded-lg"
                                         />
                                     )}

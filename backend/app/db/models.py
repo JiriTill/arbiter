@@ -98,8 +98,8 @@ class GameSourceBase(BaseDBModel):
     source_url: str | None = None
     is_official: bool = True
     file_hash: str | None = None
-    needs_ocr: bool = False
-    needs_reingest: bool = False
+    needs_ocr: bool | None = False
+    needs_reingest: bool | None = False
     verified_by: str | None = None
 
 
