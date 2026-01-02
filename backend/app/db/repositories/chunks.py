@@ -204,30 +204,31 @@ class ChunksRepository(BaseRepository[RuleChunk, RuleChunkCreate]):
         """
         # Build filter conditions
         conditions = ["rc.tsv IS NOT NULL"]
-        params: list = []
+        condition_params: list = []
         
         if game_id is not None:
             conditions.append("gs.game_id = %s")
-            params.append(game_id)
+            condition_params.append(game_id)
         
         if source_ids:
             placeholders = ", ".join(["%s"] * len(source_ids))
             conditions.append(f"rc.source_id IN ({placeholders})")
-            params.extend(source_ids)
+            condition_params.extend(source_ids)
         
         # Filter out expired chunks
         conditions.append("(rc.expires_at IS NULL OR rc.expires_at > NOW())")
         
         where_clause = " AND ".join(conditions)
         
-        # Add query for tsquery conversion
-        params.append(query)
-        params.append(query)
-        params.append(limit)
+        # Build params in the exact order they appear in SQL:
+        # 1. query (for ts_rank_cd in SELECT)
+        # 2. condition_params (for WHERE filters)
+        # 3. query (for tsv @@ in WHERE)
+        # 4. limit
+        params = [query] + condition_params + [query, limit]
         
         # Use websearch_to_tsquery for natural language parsing
-        # Falls back to plainto_tsquery if websearch fails
-        search_query = """
+        search_query = f"""
             SELECT 
                 rc.*,
                 ts_rank_cd(rc.tsv, websearch_to_tsquery('english', %s)) as rank
@@ -238,15 +239,18 @@ class ChunksRepository(BaseRepository[RuleChunk, RuleChunkCreate]):
             AND rc.tsv @@ websearch_to_tsquery('english', %s)
             ORDER BY rank DESC, rc.page_number ASC
             LIMIT %s
-        """.format(where_clause=where_clause)
+        """
         
         async with self._get_cursor() as cur:
             try:
                 await cur.execute(search_query, tuple(params))
                 rows = await cur.fetchall()
             except Exception:
+                # Rollback the failed transaction before trying fallback
+                await cur.execute("ROLLBACK")
+                
                 # Fallback to plainto_tsquery if websearch fails
-                fallback_query = """
+                fallback_query = f"""
                     SELECT 
                         rc.*,
                         ts_rank_cd(rc.tsv, plainto_tsquery('english', %s)) as rank
@@ -257,7 +261,7 @@ class ChunksRepository(BaseRepository[RuleChunk, RuleChunkCreate]):
                     AND rc.tsv @@ plainto_tsquery('english', %s)
                     ORDER BY rank DESC, rc.page_number ASC
                     LIMIT %s
-                """.format(where_clause=where_clause)
+                """
                 await cur.execute(fallback_query, tuple(params))
                 rows = await cur.fetchall()
             
