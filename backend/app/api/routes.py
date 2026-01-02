@@ -302,8 +302,8 @@ async def ask_question(
             chunks_repo=chunks_repo,
             game_id=request.game_id,
             expansion_ids=request.expansion_ids,
-            final_limit=12,
-            expand_top_k=5,
+            final_limit=20,  # Increased for better context
+            expand_top_k=7,  # Expand more top results
             detect_conflicts=True,
         )
     except Exception as e:
