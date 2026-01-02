@@ -117,15 +117,23 @@ Then provide your response as valid JSON with this exact structure:
 {{
   "question_type": "where/when/how/can/what/why",
   "verdict": "A DIRECT answer to the question type. If asking WHERE, answer with a location. If asking HOW, answer with a method. If asking CAN, answer YES/NO. Always include the specific rule.",
-  "quote_exact": "exact verbatim quote from one excerpt that supports your answer (max 100 words)",
+  "quote_exact": "exact verbatim quote that BEST supports the MAIN point of your answer (max 100 words). Pick the quote about the SPECIFIC thing asked, not a related topic.",
   "quote_chunk_id": the_chunk_id_number,
   "page": page_number,
   "source_type": "rulebook or faq or errata",
-  "confidence": "high or medium or low",
+  "confidence": "high/medium/low - see guidance below",
   "notes": ["optional array", "of additional notes or clarifications"]
 }}
 
-IMPORTANT: Match your answer to the question type. A 'where' question needs a location answer, not just 'yes you can'.
+CONFIDENCE GUIDANCE:
+- "high": The excerpts DIRECTLY answer the question with clear, unambiguous rules
+- "medium": The excerpts contain relevant information but you had to infer or combine pieces
+- "low": ONLY use when excerpts don't really answer the question or are clearly about something else
+
+IMPORTANT: 
+- Match your answer to the question type
+- Choose a quote that supports the MAIN part of your answer
+- If you give a good, complete answer from the excerpts, confidence should be "high" or "medium", NOT "low"
 
 Respond ONLY with the JSON, no other text."""
 
