@@ -18,8 +18,8 @@ from app.db.models import RuleChunk, RuleChunkSearchResult
 logger = logging.getLogger(__name__)
 
 # Model configuration
-ANSWER_MODEL = "gpt-4o-mini"
-MAX_TOKENS = 1000
+ANSWER_MODEL = "gpt-4o"  # Using gpt-4o for better reasoning
+MAX_TOKENS = 1500
 
 
 # Prompt template for answer generation
@@ -106,16 +106,24 @@ Question: {question}
 Rule Excerpts:
 {chunks_text}
 
-Based on these excerpts, answer the question. Provide your response as valid JSON with this exact structure:
+Before answering, think step by step:
+1. What TYPE of question is this? (WHERE/WHEN/HOW/CAN/WHAT/WHY)
+2. What SPECIFIC thing is being asked about?
+3. Do the excerpts contain information that DIRECTLY answers this specific question type?
+
+Then provide your response as valid JSON with this exact structure:
 {{
-  "verdict": "YES/NO/It depends + clear explanation of the rule",
-  "quote_exact": "exact verbatim quote from one excerpt (max 100 words)",
+  "question_type": "where/when/how/can/what/why",
+  "verdict": "A DIRECT answer to the question type. If asking WHERE, answer with a location. If asking HOW, answer with a method. If asking CAN, answer YES/NO. Always include the specific rule.",
+  "quote_exact": "exact verbatim quote from one excerpt that supports your answer (max 100 words)",
   "quote_chunk_id": the_chunk_id_number,
   "page": page_number,
   "source_type": "rulebook or faq or errata",
   "confidence": "high or medium or low",
-  "notes": ["optional array", "of additional notes"]
+  "notes": ["optional array", "of additional notes or clarifications"]
 }}
+
+IMPORTANT: Match your answer to the question type. A 'where' question needs a location answer, not just 'yes you can'.
 
 Respond ONLY with the JSON, no other text."""
 
