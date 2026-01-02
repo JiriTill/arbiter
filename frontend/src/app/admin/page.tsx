@@ -174,6 +174,28 @@ export default function AdminPage() {
         }
     };
 
+    const handleFixImages = async () => {
+        if (!confirm("Start fixing broken BGG images?")) return;
+        try {
+            const res = await fetch(`${API_BASE_URL}/admin/maintenance/fix-images`, { method: "POST" });
+            const data = await res.json();
+            alert(data.message);
+            fetchGames();
+        } catch (e) {
+            alert("Failed to fix images");
+        }
+    };
+
+    const handleDeleteSource = async (sourceId: number) => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/admin/sources/${sourceId}`, { method: "DELETE" });
+            if (!res.ok) throw new Error("Failed");
+            fetchGames();
+        } catch (e) {
+            alert("Error deleting source");
+        }
+    };
+
     const generateSlug = (name: string) => {
         return name
             .toLowerCase()
@@ -186,32 +208,38 @@ export default function AdminPage() {
     if (loading) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
-                <div className="text-muted-foreground">Loading...</div>
+                <div className="text-xl text-primary animate-pulse">Loading Arbiter Admin...</div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-background text-foreground p-6">
-            <div className="max-w-6xl mx-auto">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-8">
+        <div className="min-h-screen bg-background text-foreground font-sans">
+            <div className="max-w-6xl mx-auto p-6">
+                {/* Header Section */}
+                <div className="flex items-center justify-between mb-8 bg-card p-6 rounded-xl border border-border shadow-sm">
                     <div>
                         <h1 className="text-3xl font-bold text-primary">🎲 Admin Dashboard</h1>
                         <p className="text-muted-foreground mt-1">Manage games and rulebooks</p>
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex gap-2">
                         <button
-                            onClick={() => setShowGameForm(!showGameForm)}
-                            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition"
+                            onClick={handleFixImages}
+                            className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg flex items-center gap-2 transition"
                         >
-                            + Add Game
+                            🔧 Fix Images
                         </button>
                         <button
-                            onClick={() => setShowUploadForm(!showUploadForm)}
-                            className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:opacity-90 transition"
+                            onClick={() => setShowGameForm(true)}
+                            className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg flex items-center gap-2 transition"
                         >
-                            📄 Upload PDF
+                            <span>+</span> Add Game
+                        </button>
+                        <button
+                            onClick={() => setShowUploadForm(true)}
+                            className="px-4 py-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-lg flex items-center gap-2 transition"
+                        >
+                            <span>📄</span> Upload PDF
                         </button>
                     </div>
                 </div>
@@ -431,8 +459,8 @@ export default function AdminPage() {
                 )}
 
                 {/* Games List */}
-                <div className="bg-card border border-border rounded-xl overflow-hidden">
-                    <div className="p-4 border-b border-border">
+                <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-border">
                         <h2 className="text-xl font-semibold">Games ({games.length})</h2>
                     </div>
                     <div className="divide-y divide-border">
@@ -481,6 +509,7 @@ export default function AdminPage() {
                                                 key={source.id}
                                                 source={source}
                                                 onProcess={() => handleProcess(source.id)}
+                                                onDelete={() => handleDeleteSource(source.id)}
                                             />
                                         ))}
                                     </div>
@@ -500,7 +529,7 @@ export default function AdminPage() {
     );
 }
 
-function SourceRow({ source, onProcess }: { source: Source; onProcess: () => Promise<string | null> }) {
+function SourceRow({ source, onProcess, onDelete }: { source: Source; onProcess: () => Promise<string | null>; onDelete: () => void }) {
     const [status, setStatus] = useState<{
         status: string;
         needs_ocr: boolean;
@@ -510,6 +539,7 @@ function SourceRow({ source, onProcess }: { source: Source; onProcess: () => Pro
     const [progress, setProgress] = useState<number>(0);
     const [progressMessage, setProgressMessage] = useState<string>("");
     const [processing, setProcessing] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     // Initial status from props
     useEffect(() => {
@@ -589,6 +619,13 @@ function SourceRow({ source, onProcess }: { source: Source; onProcess: () => Pro
         }
     };
 
+    const handleDelete = async () => {
+        if (!confirm("Are you sure you want to delete this source?")) return;
+        setDeleting(true);
+        await onDelete();
+        setDeleting(false);
+    };
+
     const displayStatus = () => {
         if (jobId) return (
             <span className="text-blue-500 animate-pulse text-xs">
@@ -631,8 +668,16 @@ function SourceRow({ source, onProcess }: { source: Source; onProcess: () => Pro
                         {processing ? "Starting..." : "Process Now"}
                     </button>
                 )}
+
+                <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="p-1.5 text-red-500 hover:bg-red-500/10 rounded transition opacity-0 group-hover:opacity-100"
+                    title="Delete source"
+                >
+                    {deleting ? "..." : "🗑️"}
+                </button>
             </div>
         </div>
     );
 }
-

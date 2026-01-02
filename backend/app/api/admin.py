@@ -5,7 +5,7 @@ Admin API endpoints for content management and analytics.
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from supabase import create_client, Client
 
 from app.config import get_settings
@@ -14,10 +14,12 @@ from app.db import (
     get_costs_repo,
     get_games_repo,
     get_sources_repo,
+    get_chunks_repo,
     FeedbackRepository,
     CostsRepository,
     GamesRepository,
     SourcesRepository,
+    ChunksRepository,
 )
 from app.db.models import GameCreate, GameSourceCreate
 
@@ -306,6 +308,61 @@ async def get_source_status(
         "needs_reingest": source.needs_reingest,
         "last_ingested_at": source.last_ingested_at.isoformat() if source.last_ingested_at else None,
     }
+
+
+@router.delete("/sources/{source_id}")
+async def delete_source(
+    source_id: int,
+    request: Request,
+    sources_repo: SourcesRepository = Depends(get_sources_repo),
+    chunks_repo: ChunksRepository = Depends(get_chunks_repo),
+) -> dict[str, Any]:
+    """Delete a source and its associated chunks."""
+    
+    # 1. Check if source exists
+    source = await sources_repo.get_source(source_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    
+    # 2. Delete chunks
+    await chunks_repo.delete_chunks_by_source(source_id)
+    
+    # 3. Delete source
+    deleted = await sources_repo.delete_source(source_id)
+    
+    if not deleted:
+        raise HTTPException(status_code=500, detail="Failed to delete source")
+        
+    return {"success": True, "message": f"Source {source_id} deleted"}
+
+
+@router.post("/maintenance/fix-images")
+async def fix_game_images():
+    """Fix broken BGG image URLs by removing filter parameters."""
+    count = 0
+    from app.db.connection import get_async_connection
+    
+    async with get_async_connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT id, cover_image_url FROM games WHERE cover_image_url LIKE '%filters:%'")
+            rows = await cur.fetchall()
+            
+            for row in rows:
+                game_id, url = row
+                if "/fit-in" in url and "/pic" in url:
+                    base_part = url.split("/fit-in")[0]
+                    filename = url.split("/")[-1]
+                    new_url = f"{base_part}/{filename}"
+                    
+                    await cur.execute(
+                        "UPDATE games SET cover_image_url = %s WHERE id = %s",
+                        (new_url, game_id)
+                    )
+                    count += 1
+            
+            await conn.commit()
+            
+    return {"success": True, "fixed_count": count, "message": f"Fixed {count} image URLs"}
 
 
 
