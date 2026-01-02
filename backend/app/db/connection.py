@@ -34,6 +34,7 @@ async def get_async_pool() -> AsyncConnectionPool:
             min_size=2,
             max_size=10,
             open=False,
+            kwargs={"prepare_threshold": None}  # Disable prepared statements for transaction pooler
         )
         await _async_pool.open()
     return _async_pool
@@ -88,6 +89,7 @@ def get_sync_pool() -> ConnectionPool:
             min_size=1,
             max_size=5,
             open=True,
+            kwargs={"prepare_threshold": None}  # Disable prepared statements for transaction pooler
         )
     return _sync_pool
 
