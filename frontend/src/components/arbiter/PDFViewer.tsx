@@ -66,14 +66,14 @@ export function PDFViewer({ url, initialPage = 1, quote, gameName, sourceName }:
         <div className="flex flex-col w-full min-h-screen bg-gray-50 dark:bg-gray-950" ref={containerRef}>
             {/* Header / Banner */}
             {quote && (
-                <div className="bg-amber-50 border-b border-amber-200 p-4 shadow-sm sticky top-0 z-20">
+                <div className="bg-amber-500/10 border-b border-amber-500/20 p-4 shadow-sm sticky top-0 z-20 backdrop-blur-md">
                     <div className="max-w-4xl mx-auto">
-                        <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-1">
-                            Look for this quote on page {initialPage}
+                        <p className="text-xs font-bold text-amber-500 uppercase tracking-wide mb-1 flex items-center gap-2">
+                            Evidence found on page {initialPage}
                         </p>
-                        <p className="text-sm text-gray-800 italic border-l-4 border-amber-400 pl-3 py-1 bg-white/50 rounded">
+                        <div className="text-sm text-foreground/90 italic border-l-2 border-amber-500/50 pl-3 py-1 bg-amber-500/5 rounded-r">
                             &quot;{quote}&quot;
-                        </p>
+                        </div>
                     </div>
                 </div>
             )}

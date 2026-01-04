@@ -1,198 +1,224 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, BookOpen, CheckCircle2, Zap, Shield, MessageCircleQuestion } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowRight, BookOpen, CheckCircle2, Zap, Shield, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { VerdictShowcase } from "@/components/landing/VerdictShowcase";
+import { cn } from "@/lib/utils";
 
-// How it works steps
+// Typing effect hook
+function useTypewriter(phrases: string[], speed = 50, pause = 3000) {
+    const [index, setIndex] = useState(0);
+    const [subIndex, setSubIndex] = useState(0);
+    const [reverse, setReverse] = useState(false);
+    const [blink, setBlink] = useState(true);
+
+    // Blinking cursor
+    useEffect(() => {
+        const timeout = setInterval(() => {
+            setBlink((prev) => !prev);
+        }, 500);
+        return () => clearInterval(timeout);
+    }, []);
+
+    // Typing logic
+    useEffect(() => {
+        if (subIndex === phrases[index].length + 1 && !reverse) {
+            const timeout = setTimeout(() => {
+                setReverse(true);
+            }, pause);
+            return () => clearTimeout(timeout);
+        }
+
+        if (subIndex === 0 && reverse) {
+            setReverse(false);
+            setIndex((prev) => (prev + 1) % phrases.length);
+            return;
+        }
+
+        const timeout = setTimeout(() => {
+            setSubIndex((prev) => prev + (reverse ? -1 : 1));
+        }, Math.max(reverse ? speed / 2 : speed, parseInt(Math.random() * 50 + "")));
+
+        return () => clearTimeout(timeout);
+    }, [subIndex, index, reverse, phrases, speed, pause]);
+
+    return `${phrases[index].substring(0, subIndex)}${blink ? "|" : " "}`;
+}
+
 const steps = [
     {
-        icon: <MessageCircleQuestion className="h-8 w-8" />,
-        title: "Ask Your Question",
-        description: "Type any rules question about your board game",
+        icon: <Search className="h-6 w-6" />,
+        title: "Ask a Question",
+        description: "Type any rules dispute in plain English",
     },
     {
-        icon: <BookOpen className="h-8 w-8" />,
-        title: "AI Searches Rulebooks",
-        description: "The Arbiter scans official rulebooks instantly",
+        icon: <BookOpen className="h-6 w-6" />,
+        title: "AI Scans Rulebooks",
+        description: "We verify against official PDFs instantly",
     },
     {
-        icon: <CheckCircle2 className="h-8 w-8" />,
-        title: "Get Verified Answer",
-        description: "Receive an answer with exact page citations",
+        icon: <CheckCircle2 className="h-6 w-6" />,
+        title: "Get Verified Verdict",
+        description: "Receive a clear Yes/No with citations",
     },
 ];
 
-// Features
-const features = [
-    {
-        icon: <Zap className="h-6 w-6 text-amber-400" />,
-        title: "Instant Answers",
-        description: "No more flipping through rulebooks",
-    },
-    {
-        icon: <Shield className="h-6 w-6 text-emerald-400" />,
-        title: "Verified Citations",
-        description: "Every answer includes page references",
-    },
-    {
-        icon: <BookOpen className="h-6 w-6 text-blue-400" />,
-        title: "Official Sources",
-        description: "Answers from official rulebooks only",
-    },
-];
-
-// Popular games (visual showcase)
 const featuredGames = [
-    { name: "Catan", initial: "C", color: "from-orange-500 to-red-600" },
-    { name: "Root", initial: "R", color: "from-green-500 to-emerald-600" },
-    { name: "Wingspan", initial: "W", color: "from-sky-500 to-blue-600" },
-    { name: "Lord of the Rings", initial: "L", color: "from-amber-500 to-yellow-600" },
+    { name: "Catan", initial: "Ca", color: "from-orange-500 to-red-600", players: "3-4" },
+    { name: "Root", initial: "Ro", color: "from-emerald-600 to-green-700", players: "2-4" },
+    { name: "Wingspan", initial: "Wi", color: "from-sky-400 to-blue-500", players: "1-5" },
+    { name: "Scythe", initial: "Sc", color: "from-red-700 to-red-900", players: "1-5" },
+    { name: "Azul", initial: "Az", color: "from-blue-500 to-indigo-600", players: "2-4" },
+    { name: "Dune Imp.", initial: "Du", color: "from-amber-600 to-orange-700", players: "1-4" },
 ];
 
 export default function LandingPage() {
-    return (
-        <div className="min-h-screen flex flex-col">
-            {/* Hero Section */}
-            <section className="relative flex-1 flex flex-col items-center justify-center px-6 py-16 text-center overflow-hidden">
-                {/* Background gradient */}
-                <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-background to-background pointer-events-none" />
+    const typedText = useTypewriter([
+        "Can I play a Knight before rolling dice?",
+        "Does the robber block production for everyone?",
+        "Can I trade with the bank at 3:1?",
+        "Do eggs count as points in Wingspan?",
+    ]);
 
-                {/* Gavel Icon - Logo placeholder */}
-                <div className="relative mb-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-2xl shadow-emerald-500/20">
-                        <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="h-10 w-10 text-white"
-                        >
-                            {/* Gavel icon */}
-                            <path d="M14.5 12.5L6 21l-3-3 8.5-8.5" />
-                            <path d="M18.5 8.5L21 6l-3-3-2.5 2.5" />
-                            <path d="M12 10l4-4" />
-                            <rect x="12" y="6" width="6" height="4" rx="1" transform="rotate(45 15 8)" />
-                        </svg>
-                    </div>
-                </div>
+    return (
+        <div className="min-h-screen flex flex-col overflow-x-hidden">
+            {/* Hero Section */}
+            <section className="relative flex flex-col items-center justify-center px-4 pt-16 pb-20 text-center">
+                {/* Background effects */}
+                <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 via-background to-background pointer-events-none" />
+                <div className="absolute top-20 left-10 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none opacity-50 animate-pulse" />
+                <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl pointer-events-none opacity-30" />
 
                 {/* Main Headline */}
-                <h1 className="relative text-4xl sm:text-5xl font-bold tracking-tight mb-4 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
-                    <span className="bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
+                <div className="relative z-10 space-y-4 max-w-4xl mx-auto">
+                    <div className="flex items-center justify-center gap-2 mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold border border-emerald-500/20">
+                            v1.0 Now Live
+                        </span>
+                    </div>
+
+                    <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
                         The Arbiter
-                    </span>
-                </h1>
+                    </h1>
 
-                {/* Tagline */}
-                <p className="relative text-lg sm:text-xl text-muted-foreground max-w-md mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
-                    Instant, verified answers to your board game rules questions
-                </p>
+                    <p className="text-xl sm:text-2xl text-muted-foreground max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
+                        Stop arguing. Start playing.
+                        <br />
+                        <span className="text-foreground/90 font-medium">Instant, verified answers</span> to your board game rules questions.
+                    </p>
 
-                {/* CTA Button */}
-                <Link href="/ask" className="relative animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300">
-                    <Button
-                        size="lg"
-                        className="h-14 px-8 text-lg font-semibold bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/25 transition-all hover:shadow-xl hover:shadow-emerald-500/30"
-                    >
-                        Ask a Question
-                        <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
-                </Link>
-
-                {/* Trust indicator */}
-                <p className="relative mt-6 text-sm text-muted-foreground animate-in fade-in duration-500 delay-500">
-                    <CheckCircle2 className="inline h-4 w-4 mr-1 text-emerald-500" />
-                    Every answer verified against official rulebooks
-                </p>
-            </section>
-
-            {/* How It Works */}
-            <section className="px-6 py-12 bg-card/30">
-                <h2 className="text-center text-xl font-semibold mb-8 text-muted-foreground">
-                    How It Works
-                </h2>
-                <div className="max-w-lg mx-auto space-y-6">
-                    {steps.map((step, idx) => (
-                        <div
-                            key={idx}
-                            className="flex items-start gap-4 animate-in fade-in slide-in-from-left-4 duration-300"
-                            style={{ animationDelay: `${idx * 100}ms` }}
-                        >
-                            <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
-                                {step.icon}
-                            </div>
-                            <div>
-                                <h3 className="font-semibold mb-1">{step.title}</h3>
-                                <p className="text-sm text-muted-foreground">{step.description}</p>
+                    {/* Typing Search Sim */}
+                    <div className="mt-10 mx-auto max-w-xl w-full animate-in fade-in zoom-in-95 duration-700 delay-300">
+                        <div className="relative group">
+                            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-200"></div>
+                            <div className="relative bg-card border border-border rounded-xl p-4 flex items-center shadow-2xl">
+                                <Search className="h-6 w-6 text-muted-foreground mr-4" />
+                                <div className="text-lg text-muted-foreground font-mono truncate w-full text-left">
+                                    {typedText}
+                                </div>
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                    <Button size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-white">
+                                        Ask
+                                    </Button>
+                                </div>
                             </div>
                         </div>
-                    ))}
+                    </div>
+
+                    {/* CTA */}
+                    <div className="mt-10 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500">
+                        <Link href="/ask">
+                            <Button
+                                size="lg"
+                                className="h-14 px-10 text-lg font-bold bg-emerald-500 hover:bg-emerald-600 text-white shadow-xl shadow-emerald-500/20 hover:shadow-emerald-500/30 hover:scale-105 transition-all"
+                            >
+                                Try it now
+                                <ArrowRight className="ml-2 h-5 w-5" />
+                            </Button>
+                        </Link>
+                        <p className="mt-4 text-sm text-muted-foreground">
+                            No account required • 100% Free
+                        </p>
+                    </div>
                 </div>
             </section>
 
-            {/* Features */}
-            <section className="px-6 py-12">
-                <div className="max-w-lg mx-auto grid grid-cols-1 gap-4">
-                    {features.map((feature, idx) => (
-                        <div
-                            key={idx}
-                            className="flex items-center gap-3 p-4 rounded-xl bg-card/50 border border-border/50"
-                        >
-                            <div className="flex-shrink-0">{feature.icon}</div>
-                            <div>
-                                <h3 className="font-medium text-sm">{feature.title}</h3>
-                                <p className="text-xs text-muted-foreground">{feature.description}</p>
+            {/* Verdict Showcase - NEW */}
+            <section className="py-20 px-4 bg-muted/30 border-y border-border/50">
+                <div className="max-w-7xl mx-auto">
+                    <div className="text-center mb-12">
+                        <h2 className="text-3xl font-bold mb-4">See it in action</h2>
+                        <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                            The Arbiter doesn't just guess. It reads specific rulebooks and gives you a definitive YES or NO with evidence.
+                        </p>
+                    </div>
+
+                    <VerdictShowcase />
+
+                    <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                        {steps.map((step, idx) => (
+                            <div key={idx} className="flex flex-col items-center text-center space-y-3 p-6 rounded-2xl bg-card border border-border/50 hover:border-emerald-500/30 transition-colors">
+                                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-2">
+                                    {step.icon}
+                                </div>
+                                <h3 className="font-semibold text-lg">{step.title}</h3>
+                                <p className="text-muted-foreground">{step.description}</p>
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             </section>
 
-            {/* Supported Games Preview */}
-            <section className="px-6 py-12 bg-card/30">
-                <h2 className="text-center text-xl font-semibold mb-6">
-                    Games We Support
-                </h2>
-                <div className="flex justify-center gap-4 flex-wrap max-w-lg mx-auto">
-                    {featuredGames.map((game, idx) => (
-                        <div
-                            key={idx}
-                            className="flex flex-col items-center gap-2"
-                        >
-                            <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${game.color} flex items-center justify-center text-2xl font-bold text-white shadow-lg`}>
-                                {game.initial}
+            {/* Supported Games */}
+            <section className="py-20 px-4">
+                <div className="max-w-6xl mx-auto text-center">
+                    <h2 className="text-3xl font-bold mb-10">Supported Games</h2>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6">
+                        {featuredGames.map((game, idx) => (
+                            <div key={idx} className="group relative aspect-square">
+                                <div className={cn(
+                                    "absolute inset-0 rounded-2xl bg-gradient-to-br opacity-80 transition-all duration-300 group-hover:scale-105 group-hover:opacity-100 shadow-lg",
+                                    game.color
+                                )} />
+                                <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-2">
+                                    <span className="text-3xl font-bold mb-1 drop-shadow-md">{game.initial}</span>
+                                    <span className="font-semibold text-sm drop-shadow-md">{game.name}</span>
+                                    <span className="text-[10px] opacity-80 mt-1">{game.players} Players</span>
+                                </div>
                             </div>
-                            <span className="text-xs text-muted-foreground">{game.name}</span>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
+
+                    <div className="mt-12 p-8 rounded-3xl bg-card border border-border max-w-3xl mx-auto text-center relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent" />
+                        <h3 className="text-2xl font-bold mb-2">Don't see your game?</h3>
+                        <p className="text-muted-foreground mb-6">
+                            We are indexing new rulebooks every week. Check back soon or request a game.
+                        </p>
+                        <Link href="/ask">
+                            <Button variant="outline" className="border-border hover:bg-muted">
+                                Browse All Games
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
-                <p className="text-center text-sm text-muted-foreground mt-6">
-                    + we&apos;re adding more games every week!
-                </p>
             </section>
 
-            {/* Final CTA */}
-            <section className="px-6 py-16 text-center">
-                <h2 className="text-2xl font-bold mb-4">Ready to Settle the Debate?</h2>
-                <p className="text-muted-foreground mb-6">
-                    Stop arguing, start playing.
-                </p>
-                <Link href="/ask">
-                    <Button
-                        size="lg"
-                        className="bg-emerald-500 hover:bg-emerald-600 text-white"
-                    >
-                        Ask The Arbiter Now
-                        <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
-                </Link>
-            </section>
-
-            {/* Spacer for bottom nav */}
-            <div className="h-20" />
+            {/* Footer */}
+            <footer className="py-12 px-6 border-t border-border mt-auto">
+                <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white font-bold">A</div>
+                        <span className="font-bold">The Arbiter</span>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                        © 2026 NeoAntica. built with ❤️ for board gamers.
+                    </div>
+                </div>
+            </footer>
         </div>
     );
 }
