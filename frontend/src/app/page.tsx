@@ -1,5 +1,6 @@
-import { redirect } from "next/navigation";
+import LandingPage from "./landing/page";
 
 export default function Home() {
-  redirect("/ask");
+  // Show the landing page as the home page
+  return <LandingPage />;
 }
