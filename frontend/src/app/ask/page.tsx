@@ -99,6 +99,7 @@ function ResultDisplay({
                     page={citation.page}
                     verified={citation.verified}
                     sourceId={citation.source_id}
+                    edition={result.edition || undefined}
                 />
             ))}
 

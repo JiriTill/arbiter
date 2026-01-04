@@ -8,10 +8,11 @@ interface QuoteCardProps {
     page: number;
     verified: boolean;
     sourceId?: number | null;
+    edition?: string;
     className?: string;
 }
 
-export function QuoteCard({ quote, page, verified, sourceId, className }: QuoteCardProps) {
+export function QuoteCard({ quote, page, verified, sourceId, edition, className }: QuoteCardProps) {
     const handleViewOriginal = () => {
         if (sourceId) {
             window.open(`/source/${sourceId}?page=${page}`, '_blank');
@@ -41,9 +42,11 @@ export function QuoteCard({ quote, page, verified, sourceId, className }: QuoteC
             <div className="p-4 sm:p-5">
                 {/* Simplified Header - single line with page + view option */}
                 <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                         <FileText className="h-4 w-4" />
-                        <span>Rulebook, Page {page}</span>
+                        <span className="font-medium">Rulebook</span>
+                        {edition && <span className="opacity-70">({edition})</span>}
+                        <span>• Page {page}</span>
                     </div>
 
                     {/* View Original - inline in header to save space */}
