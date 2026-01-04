@@ -10,21 +10,24 @@ interface HistoryItemProps {
     className?: string;
 }
 
-const confidenceBadge: Record<Confidence, { icon: React.ElementType; color: string; bgColor: string }> = {
+const confidenceBadge: Record<Confidence, { icon: React.ElementType; color: string; bgColor: string; borderColor: string }> = {
     high: {
         icon: CheckCircle,
-        color: "text-[#4ade80]",
-        bgColor: "bg-[#4ade80]/10",
+        color: "text-emerald-400",
+        bgColor: "bg-emerald-500/10",
+        borderColor: "border-emerald-500/20",
     },
     medium: {
         icon: AlertTriangle,
-        color: "text-[#fbbf24]",
-        bgColor: "bg-[#fbbf24]/10",
+        color: "text-amber-400",
+        bgColor: "bg-amber-500/10",
+        borderColor: "border-amber-500/20",
     },
     low: {
         icon: HelpCircle,
-        color: "text-[#f87171]",
-        bgColor: "bg-[#f87171]/10",
+        color: "text-amber-400",
+        bgColor: "bg-amber-500/10",
+        borderColor: "border-amber-500/20",
     },
 };
 
@@ -37,48 +40,60 @@ export function HistoryItem({ entry, onClick, className }: HistoryItemProps) {
             type="button"
             onClick={onClick}
             className={cn(
-                "flex w-full items-start gap-3 p-4 text-left",
-                "transition-colors hover:bg-[#1a1a1a] active:bg-[#222222]",
-                "border-b border-[#2a2a2a] last:border-b-0",
-                "min-h-[72px]", // Good tap target
+                "flex w-full items-start gap-4 p-4 text-left group",
+                "transition-all duration-200",
+                "hover:bg-muted/30 hover:border-emerald-500/30 active:scale-[0.99]",
+                "border-b border-border last:border-b-0",
+                "min-h-[80px]", // Good tap target
                 className
             )}
         >
             {/* Game Icon */}
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted mt-0.5">
-                <Gamepad2 className="h-5 w-5 text-muted-foreground" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-muted to-muted/50 border border-border/50 mt-0.5 group-hover:border-emerald-500/30 transition-colors">
+                <Gamepad2 className="h-5 w-5 text-muted-foreground group-hover:text-emerald-400 transition-colors" />
             </div>
 
             {/* Content */}
-            <div className="flex-1 min-w-0 space-y-1.5">
+            <div className="flex-1 min-w-0 space-y-2">
                 {/* Game + Edition + Timestamp */}
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground/80">{entry.gameName}</span>
-                    <span className="hidden sm:inline">•</span>
-                    <span className="hidden sm:inline">{entry.gameEdition}</span>
-                    <span className="ml-auto shrink-0">{formatRelativeTime(entry.timestamp)}</span>
+                    <span className="font-medium text-foreground/90">{entry.gameName}</span>
+                    {entry.gameEdition && (
+                        <>
+                            <span className="hidden sm:inline opacity-50">•</span>
+                            <span className="hidden sm:inline opacity-70">{entry.gameEdition}</span>
+                        </>
+                    )}
+                    <span className="ml-auto shrink-0 font-medium">{formatRelativeTime(entry.timestamp)}</span>
                 </div>
 
                 {/* Question (truncated to 2 lines) */}
-                <p className="text-sm font-medium leading-snug line-clamp-2">
+                <p className="text-sm font-medium leading-snug line-clamp-2 text-foreground/90 group-hover:text-emerald-400 transition-colors">
                     {entry.question}
                 </p>
 
-                {/* Confidence Badge */}
-                <div
-                    className={cn(
-                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs",
-                        badge.bgColor,
-                        badge.color
-                    )}
-                >
-                    <BadgeIcon className="h-3 w-3" />
-                    <span className="capitalize">{entry.confidence}</span>
+                {/* Verdict Snippet & Badge */}
+                <div className="flex items-center gap-3 pt-1">
+                    <div
+                        className={cn(
+                            "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium border",
+                            badge.bgColor,
+                            badge.color,
+                            badge.borderColor
+                        )}
+                    >
+                        <BadgeIcon className="h-3 w-3" />
+                        <span className="capitalize">{entry.confidence}</span>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground truncate flex-1">
+                        {entry.verdict}
+                    </p>
                 </div>
             </div>
 
             {/* Arrow */}
-            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground mt-3" />
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/30 mt-4 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
         </button>
     );
 }
