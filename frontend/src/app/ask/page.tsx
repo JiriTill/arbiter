@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
     QuoteCard,
-    CitationCard,
     VerdictCard,
     GameSelector,
     RecentQuestions,
@@ -73,7 +72,7 @@ function ResultDisplay({
                     className="text-muted-foreground hover:text-foreground -ml-2"
                 >
                     <ArrowLeft className="mr-1 h-4 w-4" />
-                    Ask another question
+                    Ask about {result.game_name}
                 </Button>
 
                 <div className="rounded-lg border border-border bg-card/50 p-3">
@@ -92,22 +91,15 @@ function ResultDisplay({
                 question={result.question}
             />
 
-            {/* Citations */}
+            {/* Citations - simplified, merged into QuoteCard */}
             {result.citations.map((citation, idx) => (
-                <div key={idx} className="space-y-3">
-                    <QuoteCard
-                        quote={citation.quote}
-                        page={citation.page}
-                        verified={citation.verified}
-                    />
-                    <CitationCard
-                        sourceType={citation.source_type}
-                        edition={result.edition || undefined}
-                        page={citation.page}
-                        sourceId={citation.source_id}
-                        quote={citation.quote}
-                    />
-                </div>
+                <QuoteCard
+                    key={idx}
+                    quote={citation.quote}
+                    page={citation.page}
+                    verified={citation.verified}
+                    sourceId={citation.source_id}
+                />
             ))}
 
             {/* Superseded Rule Warning */}
@@ -523,7 +515,7 @@ export default function AskPage() {
                         className={cn(
                             "h-14 w-full text-lg font-semibold",
                             "transition-all duration-200",
-                            !isSubmitDisabled && "bg-[#4ade80] hover:bg-[#4ade80]/90 text-black"
+                            !isSubmitDisabled && "bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                         )}
                         size="lg"
                     >
@@ -535,22 +527,29 @@ export default function AskPage() {
                         ) : (
                             <>
                                 <Send className="mr-2 h-5 w-5" />
-                                Ask The Arbiter
+                                Get Answer
                             </>
                         )}
                     </Button>
                 )}
             </div>
 
-            {/* Trust Badge */}
+            {/* Trust Badges - subtle inline chips */}
             {askState.status === "idle" && (
                 <>
-                    <div className="my-6 rounded-lg border border-border bg-card/50 p-3 text-center">
-                        <p className="text-xs text-muted-foreground">
-                            ✓ Answers verified against official rulebooks
-                            <span className="mx-2">•</span>
-                            <span className="text-primary">Citations included</span>
-                        </p>
+                    <div className="my-4 flex flex-wrap justify-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            Verified rulebooks
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-muted text-muted-foreground border border-border">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Page citations
+                        </span>
                     </div>
 
                     {/* Divider */}
