@@ -119,9 +119,14 @@ def ingest_source_job(source_id: int, force: bool = False) -> dict[str, Any]:
                     set_job_status(job_id, "failed", 52, "OCR not available on server", error="OCR not available")
                     return {"status": "needs_ocr", "error": "OCR not available"}
                 
-                # Run OCR on the PDF
-                set_job_status(job_id, "ocr", 55, f"Running OCR on {total_page_count} pages...")
-                pages = ocr_pdf_bytes(pdf_bytes, dpi=200)
+                # Run OCR on the PDF with progress callback
+                def ocr_progress(page, total, chars):
+                    # Map OCR progress to 55-75% range
+                    pct = 55 + int(20 * page / total)
+                    set_job_status(job_id, "ocr", pct, f"OCR page {page}/{total} ({chars:,} chars so far)...")
+                
+                set_job_status(job_id, "ocr", 55, f"Starting OCR on {total_page_count} pages (memory-optimized)...")
+                pages = ocr_pdf_bytes(pdf_bytes, dpi=150, progress_callback=ocr_progress)
                 total_chars = sum(len(text) for _, text in pages)
                 
                 if not pages or total_chars < 100:

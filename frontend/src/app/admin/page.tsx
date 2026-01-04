@@ -602,27 +602,37 @@ function SourceRow({ source, onProcess, onDelete, onLog }: { source: Source; onP
                 const res = await fetch(`${API_BASE_URL}/ingest/${jobId}/status`);
                 if (res.ok) {
                     const data = await res.json();
-                    console.log("Job status:", data);
+                    onLog(`Job ${jobId.substring(0, 8)}... : ${data.state} ${data.pct}% - ${data.message || ''}`);
                     setProgress(data.pct || 0);
                     setProgressMessage(data.message || "");
 
-                    if (data.state === "ready" || data.state === "failed") {
+                    if (data.state === "ready") {
+                        onLog(`✅ Job ${jobId.substring(0, 8)}... completed successfully!`);
                         setJobId(null);
                         setProcessing(false);
-                        // Trigger final update
+                        const sourceRes = await fetch(`${API_BASE_URL}/admin/sources/${source.id}/status`);
+                        if (sourceRes.ok) {
+                            setStatus(await sourceRes.json());
+                        }
+                    } else if (data.state === "failed") {
+                        onLog(`❌ Job ${jobId.substring(0, 8)}... FAILED: ${data.error || data.message || 'Unknown error'}`);
+                        setJobId(null);
+                        setProcessing(false);
                         const sourceRes = await fetch(`${API_BASE_URL}/admin/sources/${source.id}/status`);
                         if (sourceRes.ok) {
                             setStatus(await sourceRes.json());
                         }
                     }
+                } else {
+                    onLog(`⚠️ Job poll returned ${res.status}`);
                 }
             } catch (e) {
-                console.error("Job poll failed", e);
+                onLog(`❌ Job poll error: ${e}`);
             }
-        }, 1000); // Faster polling
+        }, 2000); // Poll every 2 seconds
 
         return () => clearInterval(interval);
-    }, [jobId, source.id]);
+    }, [jobId, source.id, onLog]);
 
     // Poll Source Status (fallback) - kept but slower
     useEffect(() => {
@@ -634,7 +644,7 @@ function SourceRow({ source, onProcess, onDelete, onLog }: { source: Source; onP
                 const res = await fetch(`${API_BASE_URL}/admin/sources/${source.id}/status`);
                 if (res.ok) {
                     const data = await res.json();
-                    if (!processing) setStatus(data); // Don't overwrite if local processing active
+                    if (!processing) setStatus(data);
 
                     if (data.status === "indexed") {
                         setProcessing(false);
@@ -648,13 +658,18 @@ function SourceRow({ source, onProcess, onDelete, onLog }: { source: Source; onP
 
     const handleStartProcess = async () => {
         setProcessing(true);
-        console.log("Starting processing...");
-        const newJobId = await onProcess();
-        console.log("Job ID:", newJobId);
-        if (newJobId) {
-            setJobId(newJobId);
-        } else {
-            console.error("No job ID returned");
+        onLog(`🚀 Starting ingestion for source ${source.id} (${source.edition})...`);
+        try {
+            const newJobId = await onProcess();
+            if (newJobId) {
+                onLog(`📋 Got job ID: ${newJobId}`);
+                setJobId(newJobId);
+            } else {
+                onLog(`❌ No job ID returned - check backend logs`);
+                setProcessing(false);
+            }
+        } catch (e) {
+            onLog(`❌ Error starting process: ${e}`);
             setProcessing(false);
         }
     };

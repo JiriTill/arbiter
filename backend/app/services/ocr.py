@@ -26,13 +26,16 @@ def is_ocr_available() -> bool:
     return OCR_AVAILABLE
 
 
-def ocr_pdf_bytes(pdf_bytes: bytes, dpi: int = 200) -> list[tuple[int, str]]:
+def ocr_pdf_bytes(pdf_bytes: bytes, dpi: int = 150, progress_callback=None) -> list[tuple[int, str]]:
     """
     Extract text from a scanned PDF using OCR.
     
+    MEMORY-OPTIMIZED: Processes pages one at a time to avoid OOM on limited containers.
+    
     Args:
         pdf_bytes: Raw PDF file content
-        dpi: Resolution for PDF to image conversion (higher = better quality but slower)
+        dpi: Resolution for PDF to image conversion (lower = less memory, 150 is good balance)
+        progress_callback: Optional callback(page, total_pages, text_so_far) for progress updates
         
     Returns:
         List of (page_number, text) tuples (1-indexed)
@@ -44,16 +47,39 @@ def ocr_pdf_bytes(pdf_bytes: bytes, dpi: int = 200) -> list[tuple[int, str]]:
     pages = []
     
     try:
+        import gc
+        import fitz  # PyMuPDF for page counting
+        
         logger.info(f"Starting OCR on PDF ({len(pdf_bytes)} bytes) at {dpi} DPI...")
         
-        # Convert PDF to images
-        images = convert_from_bytes(pdf_bytes, dpi=dpi)
-        total_pages = len(images)
-        logger.info(f"Converted PDF to {total_pages} images")
+        # First, get total page count using PyMuPDF (low memory)
+        with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
+            total_pages = len(doc)
         
-        for page_num, image in enumerate(images, start=1):
+        logger.info(f"PDF has {total_pages} pages - processing one at a time...")
+        
+        # Process each page individually to minimize memory usage
+        for page_num in range(1, total_pages + 1):
             try:
-                # Run OCR on this page
+                logger.info(f"OCR page {page_num}/{total_pages}...")
+                
+                # Convert only THIS page to image
+                page_images = convert_from_bytes(
+                    pdf_bytes, 
+                    dpi=dpi,
+                    first_page=page_num,
+                    last_page=page_num,
+                    grayscale=True,  # Reduce memory by ~66%
+                    thread_count=1,  # Reduce memory spikes
+                )
+                
+                if not page_images:
+                    logger.warning(f"No image generated for page {page_num}")
+                    continue
+                
+                image = page_images[0]
+                
+                # Run OCR on this single page
                 text = pytesseract.image_to_string(image, lang='eng')
                 text = text.strip()
                 
@@ -62,9 +88,19 @@ def ocr_pdf_bytes(pdf_bytes: bytes, dpi: int = 200) -> list[tuple[int, str]]:
                     logger.debug(f"Page {page_num}/{total_pages}: {len(text)} chars")
                 else:
                     logger.debug(f"Page {page_num}/{total_pages}: No text extracted")
+                
+                # CRITICAL: Free memory immediately
+                del image
+                del page_images
+                gc.collect()
+                
+                # Progress callback
+                if progress_callback:
+                    progress_callback(page_num, total_pages, sum(len(t) for _, t in pages))
                     
             except Exception as e:
                 logger.error(f"OCR failed for page {page_num}: {e}")
+                gc.collect()  # Still try to free memory
                 continue
         
         total_chars = sum(len(text) for _, text in pages)
@@ -74,6 +110,8 @@ def ocr_pdf_bytes(pdf_bytes: bytes, dpi: int = 200) -> list[tuple[int, str]]:
         
     except Exception as e:
         logger.error(f"OCR failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return []
 
 
