@@ -431,14 +431,20 @@ export default function AskPage() {
 
             {/* Main Input Section */}
             <div className="space-y-4">
-                {/* Game Selector */}
-                <GameSelector
-                    selectedGame={selectedGame}
-                    onSelect={setSelectedGame}
-                    games={apiGames}
-                />
+                {/* Step 1: Game Selector */}
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs flex items-center justify-center font-bold">1</span>
+                        Select Game
+                    </label>
+                    <GameSelector
+                        selectedGame={selectedGame}
+                        onSelect={setSelectedGame}
+                        games={apiGames}
+                    />
+                </div>
 
-                {/* Question Input */}
+                {/* Step 2: Question Input */}
                 {allNeedsOCR ? (
                     <OCRWarning
                         gameName={selectedGame?.name}
@@ -447,33 +453,53 @@ export default function AskPage() {
                 ) : (
                     <div className="space-y-2">
                         {someNeedsOCR && (
-                            <div className="rounded-md bg-amber-50 p-2 text-sm text-amber-800 border border-amber-200">
+                            <div className="rounded-md bg-amber-500/10 p-2 text-sm text-amber-400 border border-amber-500/20">
                                 Note: Expansion rules not indexed yet (scanned PDF).
                             </div>
                         )}
                         <label
                             htmlFor="question"
-                            className="text-sm font-medium text-muted-foreground"
+                            className="text-sm font-medium text-muted-foreground flex items-center gap-2"
                         >
+                            <span className={cn(
+                                "w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold",
+                                selectedGame
+                                    ? "bg-emerald-500/20 text-emerald-400"
+                                    : "bg-muted text-muted-foreground"
+                            )}>2</span>
                             Your Question
                         </label>
-                        <Textarea
-                            ref={textareaRef}
-                            id="question"
-                            value={question}
-                            onChange={(e) => setQuestion(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            placeholder="Ask a rules question..."
-                            className={cn(
-                                "min-h-[120px] max-h-[300px] resize-none text-lg",
-                                "bg-card border-border focus-visible:ring-primary",
-                                "transition-all duration-200"
-                            )}
-                            disabled={isLoading}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                            Tip: Press Ctrl+Enter to submit
-                        </p>
+
+                        {/* Disabled state when no game selected */}
+                        {!selectedGame ? (
+                            <div className="min-h-[120px] rounded-lg border-2 border-dashed border-border bg-muted/30 flex items-center justify-center p-6">
+                                <p className="text-sm text-muted-foreground text-center">
+                                    ↑ Select a game first to ask a question
+                                </p>
+                            </div>
+                        ) : (
+                            <Textarea
+                                ref={textareaRef}
+                                id="question"
+                                value={question}
+                                onChange={(e) => setQuestion(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder={`e.g., "Can I play a Knight before rolling?" or "How does the robber work?"`}
+                                className={cn(
+                                    "min-h-[120px] max-h-[300px] resize-none text-lg",
+                                    "bg-card border-border focus-visible:ring-primary",
+                                    "transition-all duration-200"
+                                )}
+                                disabled={isLoading}
+                            />
+                        )}
+
+                        {/* Tip - hide on mobile */}
+                        {selectedGame && (
+                            <p className="text-xs text-muted-foreground hidden sm:block">
+                                Tip: Press Ctrl+Enter to submit
+                            </p>
+                        )}
                     </div>
                 )}
 
