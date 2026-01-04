@@ -511,6 +511,23 @@ async def proxy_bgg_image(bgg_id: int):
     return Response(content=b"", media_type="image/png", status_code=404)
 
 
+@router.get("/maintenance/ocr-status")
+async def get_ocr_status():
+    """Check Google Cloud Vision OCR status and configuration."""
+    try:
+        from app.services.ocr_cloud import check_vision_status
+        status = check_vision_status()
+        return {
+            "ocr_available": status.get("available", False),
+            "details": status
+        }
+    except ImportError as e:
+        return {
+            "ocr_available": False,
+            "details": {"error": f"OCR module not loaded: {e}"}
+        }
+
+
 # =============================================================================
 # Feedback & Costs (existing)
 # =============================================================================

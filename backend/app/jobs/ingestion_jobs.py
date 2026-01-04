@@ -101,33 +101,68 @@ def ingest_source_job(source_id: int, force: bool = False) -> dict[str, Any]:
         
         # Check if needs OCR
         if detect_needs_ocr(pages, total_page_count):
-            logger.warning(f"PDF needs OCR - Railway memory limits prevent local OCR processing")
-            set_job_status(job_id, "extracting", 55, "Scanned PDF detected - marking for future processing...")
+            logger.info(f"PDF needs OCR - attempting Google Cloud Vision...")
+            set_job_status(job_id, "ocr", 52, "Scanned PDF detected - starting cloud OCR...")
             
-            # Mark the source as needing OCR but DON'T attempt it locally (will OOM)
-            with get_sync_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        "UPDATE game_sources SET needs_ocr = TRUE, file_hash = %s, updated_at = NOW() WHERE id = %s",
-                        (file_hash, source_id)
-                    )
-                    conn.commit()
-            
-            # If we got SOME text, let's still process what we have
-            if total_chars > 500:
-                logger.info(f"Processing {total_chars} chars of partial text extraction...")
-                set_job_status(job_id, "extracting", 60, f"Processing {total_chars} chars of partial text...")
-                # Continue with what we have
-            else:
-                # Not enough text to be useful
-                set_job_status(job_id, "failed", 55, 
-                    "Scanned PDF requires OCR. Local OCR disabled due to memory limits. Please use a text-based PDF.",
-                    error="OCR required but disabled")
-                return {
-                    "status": "needs_ocr", 
-                    "error": "Scanned PDF - OCR disabled on this server",
-                    "chars_extracted": total_chars
-                }
+            try:
+                from app.services.ocr_cloud import is_cloud_vision_available, ocr_pdf_with_vision
+                
+                if is_cloud_vision_available():
+                    # Use Google Cloud Vision (production solution)
+                    def ocr_progress(page, total, chars):
+                        pct = 52 + int(28 * page / total)  # 52-80%
+                        set_job_status(job_id, "ocr", pct, f"OCR page {page}/{total} ({chars:,} chars)...")
+                    
+                    set_job_status(job_id, "ocr", 55, f"Running Google Cloud Vision on {total_page_count} pages...")
+                    pages = ocr_pdf_with_vision(pdf_bytes, progress_callback=ocr_progress)
+                    total_chars = sum(len(text) for _, text in pages)
+                    
+                    if pages and total_chars > 100:
+                        logger.info(f"Cloud Vision OCR successful: {len(pages)} pages, {total_chars} chars")
+                        set_job_status(job_id, "ocr", 80, f"OCR complete: {total_chars:,} chars from {len(pages)} pages")
+                        
+                        # Mark as no longer needing OCR
+                        with get_sync_connection() as conn:
+                            with conn.cursor() as cur:
+                                cur.execute(
+                                    "UPDATE game_sources SET needs_ocr = FALSE, file_hash = %s, updated_at = NOW() WHERE id = %s",
+                                    (file_hash, source_id)
+                                )
+                                conn.commit()
+                    else:
+                        logger.error(f"Cloud Vision extracted only {total_chars} chars")
+                        set_job_status(job_id, "failed", 60, "OCR extracted insufficient text", error="OCR failed")
+                        return {"status": "ocr_failed", "error": "No text extracted"}
+                else:
+                    # Cloud Vision not configured - mark for later
+                    logger.warning("Cloud Vision not available - credentials not configured")
+                    set_job_status(job_id, "failed", 55, 
+                        "Scanned PDF requires OCR. Configure GOOGLE_APPLICATION_CREDENTIALS_JSON to enable.",
+                        error="Cloud OCR not configured")
+                    
+                    with get_sync_connection() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute(
+                                "UPDATE game_sources SET needs_ocr = TRUE, file_hash = %s, updated_at = NOW() WHERE id = %s",
+                                (file_hash, source_id)
+                            )
+                            conn.commit()
+                    
+                    return {"status": "needs_ocr", "error": "Cloud OCR not configured"}
+                    
+            except Exception as e:
+                logger.error(f"Cloud Vision OCR failed: {e}")
+                set_job_status(job_id, "failed", 55, f"OCR failed: {e}", error=str(e))
+                
+                with get_sync_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "UPDATE game_sources SET needs_ocr = TRUE, file_hash = %s, updated_at = NOW() WHERE id = %s",
+                            (file_hash, source_id)
+                        )
+                        conn.commit()
+                
+                return {"status": "ocr_failed", "error": str(e)}
         
         # Stage 4: Chunking (50-60%)
         set_job_status(job_id, "chunking", 55, "Splitting text into chunks...")

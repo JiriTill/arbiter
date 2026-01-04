@@ -268,6 +268,26 @@ export default function AdminPage() {
                             📋 Debug URLs
                         </button>
                         <button
+                            onClick={async () => {
+                                try {
+                                    const res = await fetch(`${API_BASE_URL}/admin/maintenance/ocr-status`);
+                                    const data = await res.json();
+                                    if (data.ocr_available) {
+                                        addLog(`✅ Cloud OCR: AVAILABLE (${data.details?.credentials_source || 'configured'})`);
+                                    } else {
+                                        addLog(`❌ Cloud OCR: NOT AVAILABLE`);
+                                        addLog(`   Reason: ${data.details?.error || 'Unknown'}`);
+                                        addLog(`   To fix: Add GOOGLE_APPLICATION_CREDENTIALS_JSON to Railway`);
+                                    }
+                                } catch (e) {
+                                    addLog(`❌ OCR status check failed: ${e}`);
+                                }
+                            }}
+                            className="px-3 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-lg text-sm transition"
+                        >
+                            🔍 OCR Status
+                        </button>
+                        <button
                             onClick={handleFixImages}
                             className="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-sm transition"
                         >

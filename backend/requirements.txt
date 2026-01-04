@@ -43,3 +43,6 @@ pytest-asyncio>=0.23.0
 
 # NLP
 nltk>=3.8.1
+
+# Google Cloud Vision OCR
+google-cloud-vision>=3.4.0
