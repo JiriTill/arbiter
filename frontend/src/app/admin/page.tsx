@@ -509,48 +509,42 @@ export default function AdminPage() {
                     </div>
                     <div className="divide-y divide-border">
                         {games.map((game) => (
-                            <div
-                                key={game.id}
-                                className="p-4 hover:bg-muted/50 transition cursor-pointer"
-                                onClick={() => setSelectedGameId(selectedGameId === game.id ? null : game.id)}
-                            >
-                                <div className="flex items-center gap-4">
-                                    {game.bgg_id && (
-                                        <img
-                                            src={`${API_BASE_URL}/admin/proxy/image/${game.bgg_id}`}
-                                            alt={game.name}
-                                            className="w-16 h-16 object-cover rounded-lg bg-muted"
-                                            onError={(e) => {
-                                                // Hide broken images
-                                                (e.target as HTMLImageElement).style.display = 'none';
-                                            }}
-                                        />
-                                    )}
-                                    <div className="flex-1">
-                                        <h3 className="font-semibold">{game.name}</h3>
-                                        <p className="text-sm text-muted-foreground">/{game.slug}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-sm text-muted-foreground">
-                                            {game.sources?.length || 0} sources
+                            <div key={game.id}>
+                                <div
+                                    className="p-4 hover:bg-muted/50 transition cursor-pointer"
+                                    onClick={() => setSelectedGameId(selectedGameId === game.id ? null : game.id)}
+                                >
+                                    <div className="flex items-center gap-4">
+                                        {/* Game thumbnail - gradient with initial */}
+                                        <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center text-2xl font-bold text-primary">
+                                            {game.name.charAt(0).toUpperCase()}
                                         </div>
-                                        {game.bgg_id && (
-                                            <a
-                                                href={`https://boardgamegeek.com/boardgame/${game.bgg_id}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-xs text-primary hover:underline"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                BGG #{game.bgg_id}
-                                            </a>
-                                        )}
+                                        <div className="flex-1">
+                                            <h3 className="font-semibold">{game.name}</h3>
+                                            <p className="text-sm text-muted-foreground">/{game.slug}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-sm text-muted-foreground">
+                                                {game.sources?.length || 0} sources
+                                            </div>
+                                            {game.bgg_id && (
+                                                <a
+                                                    href={`https://boardgamegeek.com/boardgame/${game.bgg_id}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-xs text-primary hover:underline"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    BGG #{game.bgg_id}
+                                                </a>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
                                 {/* Expanded sources view */}
                                 {selectedGameId === game.id && game.sources && game.sources.length > 0 && (
-                                    <div className="mt-4 pl-20 space-y-2">
+                                    <div className="pl-20 pb-4 space-y-2">
                                         {game.sources.map((source) => (
                                             <SourceRow
                                                 key={source.id}
@@ -589,7 +583,7 @@ export default function AdminPage() {
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
 
