@@ -412,7 +412,7 @@ export default function AskPage() {
     }
 
     return (
-        <div className="flex min-h-[calc(100vh-5rem)] flex-col p-4 sm:p-6">
+        <div className="flex min-h-[calc(100vh-5rem)] flex-col p-4 sm:p-6 pb-24 sm:pb-8">
             {/* Header */}
             <div className="mb-6">
                 <h1 className="text-2xl font-bold tracking-tight">Ask The Arbiter</h1>
@@ -487,8 +487,28 @@ export default function AskPage() {
                         )}
 
                         {/* Tip - hide on mobile */}
+                        {selectedGame && !question && (
+                            <div className="flex flex-wrap gap-2 pt-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                                <span className="text-xs text-muted-foreground self-center mr-1">Try asking:</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setQuestion("Can I play a Knight before rolling?")}
+                                    className="text-xs bg-muted/50 hover:bg-muted px-2.5 py-1.5 rounded-full transition-colors text-foreground/80 border border-transparent hover:border-border"
+                                >
+                                    "Can I play a Knight before rolling?"
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setQuestion("How does the robber work?")}
+                                    className="text-xs bg-muted/50 hover:bg-muted px-2.5 py-1.5 rounded-full transition-colors text-foreground/80 border border-transparent hover:border-border"
+                                >
+                                    "How does the robber work?"
+                                </button>
+                            </div>
+                        )}
+
                         {selectedGame && (
-                            <p className="text-xs text-muted-foreground hidden sm:block">
+                            <p className="text-xs text-muted-foreground hidden sm:block pt-1">
                                 Tip: Press Ctrl+Enter to submit
                             </p>
                         )}

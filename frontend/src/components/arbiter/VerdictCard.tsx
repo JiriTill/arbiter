@@ -149,48 +149,73 @@ export function VerdictCard({ verdict, confidence, gameName, question, className
                 </div>
             )}
 
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
                 {/* Top bar with gavel and confidence */}
                 <div className="flex items-start justify-between mb-4">
                     {/* Gavel icon with animation */}
                     <div className="flex items-center gap-3">
                         <div className={cn(
-                            "w-12 h-12 rounded-xl flex items-center justify-center",
+                            "w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center",
                             confidence === "high"
                                 ? "bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30"
                                 : "bg-gradient-to-br from-amber-500/20 to-amber-600/10 border border-amber-500/30"
                         )}>
                             <GavelIcon className={cn(
-                                "h-6 w-6",
+                                "h-5 w-5 sm:h-6 sm:w-6",
                                 confidence === "high" ? "text-emerald-400" : "text-amber-400"
                             )} />
                         </div>
-                        <div>
+                        <div className="flex flex-col">
                             <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                                 The Verdict
                             </span>
                         </div>
                     </div>
 
-                    {/* Confidence Badge */}
-                    <div className="relative group">
-                        <div
+                    {/* Right side: Share + Confidence */}
+                    <div className="flex items-center gap-2">
+                        {/* Share button - prominent position */}
+                        <button
+                            onClick={handleShare}
                             className={cn(
-                                "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium cursor-help",
-                                config.bgColor,
-                                config.color,
-                                "border",
-                                config.borderColor
+                                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs",
+                                "text-muted-foreground hover:text-foreground",
+                                "hover:bg-muted/50 transition-colors border border-transparent hover:border-border"
                             )}
                         >
-                            <Icon className="h-3.5 w-3.5" />
-                            <span>{config.label}</span>
-                        </div>
+                            {copied ? (
+                                <>
+                                    <Check className="h-3.5 w-3.5 text-emerald-400" />
+                                    <span className="text-emerald-400 hidden sm:inline">Copied!</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Share2 className="h-3.5 w-3.5" />
+                                    <span className="hidden sm:inline">Share</span>
+                                </>
+                            )}
+                        </button>
 
-                        {/* Tooltip */}
-                        <div className="absolute z-10 right-0 top-full mt-2 w-56 p-3 rounded-lg bg-popover border border-border shadow-xl text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                            <p className="font-medium text-foreground mb-1">{config.label}</p>
-                            <p>{config.sublabel}</p>
+                        {/* Confidence Badge */}
+                        <div className="relative group">
+                            <div
+                                className={cn(
+                                    "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium cursor-help",
+                                    config.bgColor,
+                                    config.color,
+                                    "border",
+                                    config.borderColor
+                                )}
+                            >
+                                <Icon className="h-3.5 w-3.5" />
+                                <span>{config.label}</span>
+                            </div>
+
+                            {/* Tooltip */}
+                            <div className="absolute z-10 right-0 top-full mt-2 w-56 p-3 rounded-lg bg-popover border border-border shadow-xl text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                <p className="font-medium text-foreground mb-1">{config.label}</p>
+                                <p>{config.sublabel}</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -213,30 +238,6 @@ export function VerdictCard({ verdict, confidence, gameName, question, className
                     ) : (
                         <span>{verdict}</span>
                     )}
-                </div>
-
-                {/* Share button */}
-                <div className="mt-4 pt-4 border-t border-border/50 flex justify-end">
-                    <button
-                        onClick={handleShare}
-                        className={cn(
-                            "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm",
-                            "text-muted-foreground hover:text-foreground",
-                            "hover:bg-muted/50 transition-colors"
-                        )}
-                    >
-                        {copied ? (
-                            <>
-                                <Check className="h-4 w-4 text-emerald-400" />
-                                <span className="text-emerald-400">Copied!</span>
-                            </>
-                        ) : (
-                            <>
-                                <Share2 className="h-4 w-4" />
-                                <span>Share verdict</span>
-                            </>
-                        )}
-                    </button>
                 </div>
             </div>
         </div>
