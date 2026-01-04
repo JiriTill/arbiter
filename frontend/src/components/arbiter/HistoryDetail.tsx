@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import { type HistoryEntry, formatRelativeTime } from "@/lib/mock-history";
 import { VerdictCard } from "./VerdictCard";
 import { QuoteCard } from "./QuoteCard";
-import { CitationCard } from "./CitationCard";
 import { SupersededCard } from "./SupersededCard";
 
 interface HistoryDetailProps {
@@ -67,22 +66,18 @@ export function HistoryDetail({ entry, onBack, className }: HistoryDetailProps) 
                     quote={entry.quote}
                     page={entry.quotePage}
                     verified={entry.quoteVerified}
-                />
-
-                {/* Citation */}
-                <CitationCard
-                    sourceType={entry.sourceType}
-                    edition={entry.sourceEdition}
-                    sourceUrl={entry.sourceUrl}
-                    page={entry.quotePage}
+                    edition={entry.sourceEdition} // Pass edition if supported
                 />
 
                 {/* Superseded (if exists) */}
                 {entry.superseded && (
                     <SupersededCard
-                        oldQuote={entry.superseded.oldQuote}
-                        oldPage={entry.superseded.oldPage}
-                        reason={entry.superseded.reason}
+                        supersededRule={{
+                            quote: entry.superseded.oldQuote,
+                            page: entry.superseded.oldPage,
+                            reason: entry.superseded.reason,
+                            source_type: "rulebook", // Default for mock data
+                        }}
                     />
                 )}
             </div>
