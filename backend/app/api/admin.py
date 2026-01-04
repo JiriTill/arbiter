@@ -453,6 +453,64 @@ async def get_failed_jobs():
     }
 
 
+@router.get("/proxy/image/{bgg_id}")
+async def proxy_bgg_image(bgg_id: int):
+    """Proxy BGG images to avoid hotlinking issues.
+    
+    This fetches the image from BGG's CDN and serves it.
+    BGG blocks direct hotlinking but allows server-to-server requests.
+    """
+    import httpx
+    from fastapi.responses import Response
+    
+    # Construct BGG image URL
+    # BGG image format: https://cf.geekdo-images.com/pic{id}.jpg (small thumb)
+    # For better quality, we'd need the full URL with hash, but this works for thumbnails
+    bgg_url = f"https://boardgamegeek.com/xmlapi2/thing?id={bgg_id}&stats=1"
+    
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as client:
+            # First, get the game info to find the image URL
+            response = await client.get(bgg_url)
+            if response.status_code != 200:
+                # Return placeholder if BGG request fails
+                return Response(
+                    content=b"",
+                    media_type="image/png",
+                    status_code=404
+                )
+            
+            # Parse XML to get image URL
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(response.content)
+            image_elem = root.find(".//image")
+            
+            if image_elem is None or not image_elem.text:
+                return Response(content=b"", media_type="image/png", status_code=404)
+            
+            image_url = image_elem.text
+            
+            # Fetch the actual image
+            img_response = await client.get(image_url, headers={
+                "User-Agent": "TheArbiter/1.0 (Board Game Rules)",
+                "Accept": "image/*"
+            })
+            
+            if img_response.status_code == 200:
+                content_type = img_response.headers.get("content-type", "image/jpeg")
+                return Response(
+                    content=img_response.content,
+                    media_type=content_type,
+                    headers={"Cache-Control": "public, max-age=86400"}  # Cache for 1 day
+                )
+            
+    except Exception as e:
+        logger.error(f"BGG image proxy error for {bgg_id}: {e}")
+    
+    # Return 404 if anything fails
+    return Response(content=b"", media_type="image/png", status_code=404)
+
+
 # =============================================================================
 # Feedback & Costs (existing)
 # =============================================================================

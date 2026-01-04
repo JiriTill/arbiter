@@ -515,12 +515,15 @@ export default function AdminPage() {
                                 onClick={() => setSelectedGameId(selectedGameId === game.id ? null : game.id)}
                             >
                                 <div className="flex items-center gap-4">
-                                    {game.cover_image_url && (
+                                    {game.bgg_id && (
                                         <img
-                                            src={game.cover_image_url}
+                                            src={`${API_BASE_URL}/admin/proxy/image/${game.bgg_id}`}
                                             alt={game.name}
-                                            referrerPolicy="no-referrer"
-                                            className="w-16 h-16 object-cover rounded-lg"
+                                            className="w-16 h-16 object-cover rounded-lg bg-muted"
+                                            onError={(e) => {
+                                                // Hide broken images
+                                                (e.target as HTMLImageElement).style.display = 'none';
+                                            }}
                                         />
                                     )}
                                     <div className="flex-1">
