@@ -529,30 +529,29 @@ export default function AskPage() {
                 {isLoading && <ResultSkeleton />}
 
                 {/* Submit Button */}
-                {!isLoading && (
-                    <Button
-                        onClick={handleSubmit}
-                        disabled={isSubmitDisabled}
-                        className={cn(
-                            "h-14 w-full text-lg font-semibold",
-                            "transition-all duration-200",
-                            !isSubmitDisabled && "bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                        )}
-                        size="lg"
-                    >
-                        {isLoading ? (
-                            <>
-                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                Consulting the rulebook...
-                            </>
-                        ) : (
-                            <>
-                                <Send className="mr-2 h-5 w-5" />
-                                Get Answer
-                            </>
-                        )}
-                    </Button>
-                )}
+                {/* Submit Button */}
+                <Button
+                    onClick={handleSubmit}
+                    disabled={isSubmitDisabled}
+                    className={cn(
+                        "h-14 w-full text-lg font-semibold",
+                        "transition-all duration-200",
+                        !isSubmitDisabled && "bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                    )}
+                    size="lg"
+                >
+                    {isLoading ? (
+                        <>
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            Consulting the rulebook...
+                        </>
+                    ) : (
+                        <>
+                            <Send className="mr-2 h-5 w-5" />
+                            Get Answer
+                        </>
+                    )}
+                </Button>
             </div>
 
             {/* Trust Badges - subtle inline chips */}

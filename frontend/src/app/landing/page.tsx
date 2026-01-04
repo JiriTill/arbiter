@@ -1,5 +1,5 @@
 "use client";
-
+// Force HMR update
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { ArrowRight, BookOpen, CheckCircle2, Zap, Shield, Search } from "lucide-react";
