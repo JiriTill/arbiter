@@ -88,6 +88,8 @@ function ResultDisplay({
             <VerdictCard
                 verdict={result.verdict}
                 confidence={result.confidence}
+                gameName={result.game_name}
+                question={result.question}
             />
 
             {/* Citations */}

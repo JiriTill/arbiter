@@ -112,3 +112,58 @@
     transform: translateX(100%);
   }
 }
+
+/* Gavel strike animation */
+@keyframes gavel {
+
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  10% {
+    transform: rotate(-15deg);
+  }
+
+  20% {
+    transform: rotate(0deg);
+  }
+}
+
+.animate-gavel {
+  animation: gavel 2s ease-in-out;
+}
+
+/* Fade in with scale for verdict */
+@keyframes verdict-appear {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-verdict {
+  animation: verdict-appear 0.4s ease-out;
+}
+
+/* Pulse glow for confidence badges */
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 currentColor;
+  }
+
+  50% {
+    box-shadow: 0 0 10px 2px currentColor;
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s infinite;
+}
