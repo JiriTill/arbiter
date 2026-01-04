@@ -239,22 +239,43 @@ export default function AdminPage() {
                         <h1 className="text-3xl font-bold text-primary">🎲 Admin Dashboard</h1>
                         <p className="text-muted-foreground mt-1">Manage games and rulebooks</p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
+                        <button
+                            onClick={async () => {
+                                try {
+                                    const res = await fetch(`${API_BASE_URL}/admin/maintenance/failed-jobs`);
+                                    const data = await res.json();
+                                    addLog(`Failed jobs: ${data.failed_count}`);
+                                    if (data.jobs && data.jobs.length > 0) {
+                                        data.jobs.forEach((job: any) => {
+                                            addLog(`❌ Job ${job.job_id}: ${job.exc_info || job.error || 'Unknown error'}`);
+                                        });
+                                    } else {
+                                        addLog(`✅ No failed jobs found`);
+                                    }
+                                } catch (e) {
+                                    addLog(`Error fetching failed jobs: ${e}`);
+                                }
+                            }}
+                            className="px-3 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg text-sm transition"
+                        >
+                            🔴 Failed Jobs
+                        </button>
                         <button
                             onClick={handleDebugUrls}
-                            className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg flex items-center gap-2 transition"
+                            className="px-3 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-sm transition"
                         >
                             📋 Debug URLs
                         </button>
                         <button
                             onClick={handleFixImages}
-                            className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg flex items-center gap-2 transition"
+                            className="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-sm transition"
                         >
                             🔧 Fix Images
                         </button>
                         <button
                             onClick={() => setShowGameForm(true)}
-                            className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg flex items-center gap-2 transition"
+                            className="px-3 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm transition"
                         >
                             <span>+</span> Add Game
                         </button>

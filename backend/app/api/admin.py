@@ -424,6 +424,35 @@ async def reset_game_images():
     return {"success": True, "message": f"Reset {count} games to placeholder images (temporary fix)"}
 
 
+@router.get("/maintenance/failed-jobs")
+async def get_failed_jobs():
+    """Get list of failed jobs with their error messages."""
+    from app.jobs.queue import get_queue, get_redis_connection
+    from rq.job import Job
+    
+    queue = get_queue("default")
+    failed_registry = queue.failed_job_registry
+    
+    failed_jobs = []
+    for job_id in failed_registry.get_job_ids():
+        try:
+            job = Job.fetch(job_id, connection=get_redis_connection())
+            failed_jobs.append({
+                "job_id": job_id,
+                "exc_info": str(job.exc_info)[:500] if job.exc_info else None,
+                "created_at": str(job.created_at) if job.created_at else None,
+                "ended_at": str(job.ended_at) if job.ended_at else None,
+                "args": str(job.args) if job.args else None,
+            })
+        except Exception as e:
+            failed_jobs.append({"job_id": job_id, "error": str(e)})
+    
+    return {
+        "failed_count": len(failed_jobs),
+        "jobs": failed_jobs[:10]  # Limit to 10 most recent
+    }
+
+
 # =============================================================================
 # Feedback & Costs (existing)
 # =============================================================================
