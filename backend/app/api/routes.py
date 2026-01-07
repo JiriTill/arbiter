@@ -707,6 +707,45 @@ async def get_history(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# NOTE: /history/latest MUST come BEFORE /history/{history_id}
+# to prevent FastAPI from matching "latest" as a history_id
+@router.get(
+    "/history/latest",
+    tags=["History"],
+    summary="Get latest verdicts for homepage",
+)
+async def get_latest_verdicts(
+    limit: int = 5,
+    history_repo: HistoryRepository = Depends(get_history_repo),
+):
+    """
+    Get the most recent verdicts for display on the homepage.
+    
+    Returns a simplified list of recent Q&A entries.
+    """
+    try:
+        entries = await history_repo.get_history(limit=limit, offset=0)
+        
+        return {
+            "success": True,
+            "verdicts": [
+                {
+                    "id": entry.id,
+                    "question": entry.question[:100] + "..." if len(entry.question) > 100 else entry.question,
+                    "verdict": entry.verdict[:150] + "..." if len(entry.verdict) > 150 else entry.verdict,
+                    "game_name": entry.game_name,
+                    "confidence": entry.confidence,
+                    "created_at": entry.created_at.isoformat() if entry.created_at else None,
+                }
+                for entry in entries
+            ],
+            "count": len(entries),
+        }
+    except Exception as e:
+        logger.error(f"Failed to get latest verdicts: {e}")
+        return {"success": False, "verdicts": [], "count": 0, "error": str(e)}
+
+
 @router.get(
     "/history/{history_id}",
     response_model=HistoryResponse,
@@ -744,43 +783,6 @@ async def get_history_entry(
     except Exception as e:
         logger.error(f"Failed to get history entry: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get(
-    "/history/latest",
-    tags=["History"],
-    summary="Get latest verdicts for homepage",
-)
-async def get_latest_verdicts(
-    limit: int = 5,
-    history_repo: HistoryRepository = Depends(get_history_repo),
-):
-    """
-    Get the most recent verdicts for display on the homepage.
-    
-    Returns a simplified list of recent Q&A entries.
-    """
-    try:
-        entries = await history_repo.get_history(limit=limit, offset=0)
-        
-        return {
-            "success": True,
-            "verdicts": [
-                {
-                    "id": entry.id,
-                    "question": entry.question[:100] + "..." if len(entry.question) > 100 else entry.question,
-                    "verdict": entry.verdict[:150] + "..." if len(entry.verdict) > 150 else entry.verdict,
-                    "game_name": entry.game_name,
-                    "confidence": entry.confidence,
-                    "created_at": entry.created_at.isoformat() if entry.created_at else None,
-                }
-                for entry in entries
-            ],
-            "count": len(entries),
-        }
-    except Exception as e:
-        logger.error(f"Failed to get latest verdicts: {e}")
-        return {"success": False, "verdicts": [], "count": 0, "error": str(e)}
 
 
 # ============================================================================
