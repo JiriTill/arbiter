@@ -421,7 +421,13 @@ async def sync_bgg_images():
             # Semaphore to limit concurrency (BGG rate limits)
             sem = asyncio.Semaphore(4)
             
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            # Add User-Agent to avoid 401
+            headers = {
+                "User-Agent": "ArbiterApp/1.0 (contact: admin@arbiter.app)",
+                "Accept": "application/xml"
+            }
+            
+            async with httpx.AsyncClient(timeout=30.0, headers=headers) as client:
                 
                 async def process_game(row):
                     game_id, name, bgg_id = row[0], row[1], row[2]
@@ -436,6 +442,10 @@ async def sync_bgg_images():
                             
                             # Parse XML
                             root = ET.fromstring(response.content)
+                            
+                            # Check what we got
+                            # logger.info(f"BGG Response for {name}: {response.content[:100]}")
+                            
                             image_elem = root.find(".//image")
                             thumbnail_elem = root.find(".//thumbnail")
                             
@@ -445,6 +455,13 @@ async def sync_bgg_images():
                                 image_url = thumbnail_elem.text
                             elif image_elem is not None and image_elem.text:
                                 image_url = image_elem.text
+                            
+                            # Ensure absolute URL
+                            if image_url and not image_url.startswith("http"):
+                                image_url = f"https:{image_url}" if image_url.startswith("//") else f"https://boardgamegeek.com{image_url}"
+                            
+                            # Log the extracted URL to debug
+                            # logger.info(f"Extracted URL for {name}: {image_url}")
                             
                             if not image_url:
                                 return {"error": "No image found in BGG response", "game": name}
