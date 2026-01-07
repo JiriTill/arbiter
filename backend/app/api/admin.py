@@ -420,14 +420,14 @@ async def sync_bgg_images():
             
             # Semaphore to limit concurrency (BGG rate limits)
             sem = asyncio.Semaphore(4)
-            
-            # Add User-Agent to avoid 401
+
+            # Add Browser User-Agent to avoid 401/403
             headers = {
-                "User-Agent": "ArbiterApp/1.0 (contact: admin@arbiter.app)",
-                "Accept": "application/xml"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
             }
             
-            async with httpx.AsyncClient(timeout=30.0, headers=headers) as client:
+            async with httpx.AsyncClient(timeout=30.0, headers=headers, follow_redirects=True) as client:
                 
                 async def process_game(row):
                     game_id, name, bgg_id = row[0], row[1], row[2]
