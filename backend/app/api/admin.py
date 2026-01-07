@@ -424,7 +424,7 @@ async def sync_bgg_images():
             async with httpx.AsyncClient(timeout=30.0) as client:
                 
                 async def process_game(row):
-                    game_id, name, bgg_id = row["id"], row["name"], row["bgg_id"]
+                    game_id, name, bgg_id = row[0], row[1], row[2]
                     async with sem:
                         try:
                             # Fetch from BGG API
