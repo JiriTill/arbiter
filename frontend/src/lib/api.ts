@@ -153,6 +153,83 @@ export async function suggestSource(
 }
 
 // ============================================================================
+// History API
+// ============================================================================
+
+export interface HistoryEntry {
+    id: number;
+    game_id: number;
+    game_name: string;
+    game_slug: string | null;
+    edition: string | null;
+    question: string;
+    verdict: string;
+    confidence: "high" | "medium" | "low";
+    confidence_reason: string | null;
+    citations: Array<{
+        chunk_id: number;
+        quote: string;
+        page: number;
+        verified: boolean;
+        source_type?: string;
+        source_id?: number;
+    }>;
+    response_time_ms: number | null;
+    model_used: string | null;
+    created_at: string;
+}
+
+export interface HistoryListResponse {
+    items: HistoryEntry[];
+    total: number;
+    limit: number;
+    offset: number;
+}
+
+export interface LatestVerdictsResponse {
+    success: boolean;
+    verdicts: Array<{
+        id: number;
+        question: string;
+        verdict: string;
+        game_name: string;
+        confidence: string;
+        created_at: string;
+    }>;
+    count: number;
+}
+
+/**
+ * Get Q&A history with optional filtering.
+ */
+export async function getHistory(
+    gameId?: number,
+    limit: number = 50,
+    offset: number = 0
+): Promise<HistoryListResponse> {
+    const params = new URLSearchParams();
+    if (gameId) params.set("game_id", gameId.toString());
+    params.set("limit", limit.toString());
+    params.set("offset", offset.toString());
+
+    return api.get<HistoryListResponse>(`/history?${params.toString()}`);
+}
+
+/**
+ * Get a single history entry by ID.
+ */
+export async function getHistoryEntry(historyId: number): Promise<HistoryEntry> {
+    return api.get<HistoryEntry>(`/history/${historyId}`);
+}
+
+/**
+ * Get latest verdicts for homepage display.
+ */
+export async function getLatestVerdicts(limit: number = 5): Promise<LatestVerdictsResponse> {
+    return api.get<LatestVerdictsResponse>(`/history/latest?limit=${limit}`);
+}
+
+// ============================================================================
 // Health API
 // ============================================================================
 
@@ -169,3 +246,4 @@ interface HealthResponse {
 export async function checkHealth(): Promise<HealthResponse> {
     return api.get<HealthResponse>("/health");
 }
+

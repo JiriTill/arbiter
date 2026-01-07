@@ -395,33 +395,32 @@ async def get_image_urls():
 
 @router.post("/maintenance/reset-images")
 async def reset_game_images():
-    """Reset images to working placeholder images.
+    """Reset images to working BGG thumbnail images.
     
-    Uses picsum.photos placeholders for now to ensure images display.
-    We can fix BGG hotlinking later - OCR functionality is priority.
+    Uses the official BGG CDN thumbnail URLs which work without hotlink issues.
     """
-    # Use reliable placeholder images (unique per game via seed)
-    placeholders = {
-        "Root": "https://picsum.photos/seed/root/200/200",
-        "Wingspan": "https://picsum.photos/seed/wingspan/200/200",
-        "Catan": "https://picsum.photos/seed/catan/200/200",
-        "Terraforming Mars": "https://picsum.photos/seed/terraforming/200/200",
-        "Splendor": "https://picsum.photos/seed/splendor/200/200",
-        "Lord of the Rings: Fate of the Fellowship": "https://picsum.photos/seed/lotr/200/200",
-        "Ticket to Ride": "https://picsum.photos/seed/tickettoride/200/200",
+    # BGG thumbnail URLs (these work without hotlinking blocks)
+    bgg_images = {
+        "Root": "https://cf.geekdo-images.com/JUAUWaVUzeBgzirhZNmHHw__thumb/img/sQgKnjDLal2EfhpDpNM6hA39e1Q=/fit-in/200x150/filters:strip_icc()/pic4254509.jpg",
+        "Wingspan": "https://cf.geekdo-images.com/yLZJCVLlIx4c7eJEWUNJ7w__thumb/img/VNToqgS2-pOGU6MuvIkMPKn_y-s=/fit-in/200x150/filters:strip_icc()/pic4458123.jpg",
+        "Catan": "https://cf.geekdo-images.com/W3Bsga_uLP9kO91gZ7H8yw__thumb/img/8a9HeqFydO7Uun_le9bXWPnidcA=/fit-in/200x150/filters:strip_icc()/pic2419375.jpg",
+        "Terraforming Mars": "https://cf.geekdo-images.com/wg9oOLcsKvDesSUdZQ4rxw__thumb/img/BTxqxgYay5tHJSoKb_wtPHCjL1U=/fit-in/200x150/filters:strip_icc()/pic3536616.jpg",
+        "Splendor": "https://cf.geekdo-images.com/rwOMxx4q5yuElIvo-1-OFw__thumb/img/LH_sLfPetmCI5pLt3DP4Qk09pDM=/fit-in/200x150/filters:strip_icc()/pic1904079.jpg",
+        "Lord of the Rings: Fate of the Fellowship": "https://cf.geekdo-images.com/vnPbLaT6yOt9m3mEQ7mFGQ__thumb/img/G8DT-JBZoaREdDKJslfI7kKWCDQ=/fit-in/200x150/filters:strip_icc()/pic6126059.jpg",
+        "Ticket to Ride": "https://cf.geekdo-images.com/ZWJg0dCdrWHxVnc0eFXK8w__thumb/img/a6vGzLkFjSwOZzDDxEcwDh3WCVI=/fit-in/200x150/filters:strip_icc()/pic38668.jpg",
     }
     
     count = 0
     from app.db.connection import get_async_connection
     async with get_async_connection() as conn:
         async with conn.cursor() as cur:
-            for name, url in placeholders.items():
+            for name, url in bgg_images.items():
                 await cur.execute("UPDATE games SET cover_image_url = %s WHERE name = %s", (url, name))
                 if cur.rowcount > 0:
                     count += 1
             await conn.commit()
             
-    return {"success": True, "message": f"Reset {count} games to placeholder images (temporary fix)"}
+    return {"success": True, "message": f"Updated {count} games with BGG thumbnail images"}
 
 
 @router.get("/maintenance/failed-jobs")

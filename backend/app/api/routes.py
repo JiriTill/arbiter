@@ -620,6 +620,170 @@ async def get_game_expansions(game_id: int):
 
 
 # ============================================================================
+# History Endpoints
+# ============================================================================
+
+class HistoryResponse(BaseModel):
+    """Response for a single history entry."""
+    id: int
+    game_id: int
+    game_name: str
+    game_slug: str | None = None
+    edition: str | None
+    question: str
+    verdict: str
+    confidence: str
+    confidence_reason: str | None = None
+    citations: list[dict]
+    response_time_ms: int | None
+    model_used: str | None
+    created_at: str
+
+
+class HistoryListResponse(BaseModel):
+    """Response for history list."""
+    items: list[HistoryResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+@router.get(
+    "/history",
+    response_model=HistoryListResponse,
+    tags=["History"],
+    summary="Get Q&A history",
+)
+async def get_history(
+    game_id: int | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    history_repo: HistoryRepository = Depends(get_history_repo),
+):
+    """
+    Get question & answer history.
+    
+    Query params:
+    - game_id: Optional filter by game
+    - limit: Maximum results (default: 50)
+    - offset: Pagination offset
+    
+    Returns all Q&A history entries, newest first.
+    """
+    try:
+        entries = await history_repo.get_history(
+            game_id=game_id,
+            limit=limit,
+            offset=offset,
+        )
+        
+        # Convert to response format
+        items = []
+        for entry in entries:
+            items.append(HistoryResponse(
+                id=entry.id,
+                game_id=entry.game_id,
+                game_name=entry.game_name,
+                game_slug=entry.game_slug,
+                edition=entry.edition,
+                question=entry.question,
+                verdict=entry.verdict,
+                confidence=entry.confidence,
+                confidence_reason=entry.confidence_reason,
+                citations=[c if isinstance(c, dict) else c.model_dump() for c in entry.citations],
+                response_time_ms=entry.response_time_ms,
+                model_used=entry.model_used,
+                created_at=entry.created_at.isoformat() if entry.created_at else None,
+            ))
+        
+        return HistoryListResponse(
+            items=items,
+            total=len(items),  # TODO: Add proper total count
+            limit=limit,
+            offset=offset,
+        )
+    except Exception as e:
+        logger.error(f"Failed to get history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/history/{history_id}",
+    response_model=HistoryResponse,
+    tags=["History"],
+    summary="Get a single history entry",
+)
+async def get_history_entry(
+    history_id: int,
+    history_repo: HistoryRepository = Depends(get_history_repo),
+):
+    """Get a single history entry by ID."""
+    try:
+        entry = await history_repo.get_history_entry(history_id)
+        
+        if not entry:
+            raise HTTPException(status_code=404, detail="History entry not found")
+        
+        return HistoryResponse(
+            id=entry.id,
+            game_id=entry.game_id,
+            game_name=entry.game_name,
+            game_slug=entry.game_slug,
+            edition=entry.edition,
+            question=entry.question,
+            verdict=entry.verdict,
+            confidence=entry.confidence,
+            confidence_reason=entry.confidence_reason,
+            citations=[c if isinstance(c, dict) else c.model_dump() for c in entry.citations],
+            response_time_ms=entry.response_time_ms,
+            model_used=entry.model_used,
+            created_at=entry.created_at.isoformat() if entry.created_at else None,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get history entry: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/history/latest",
+    tags=["History"],
+    summary="Get latest verdicts for homepage",
+)
+async def get_latest_verdicts(
+    limit: int = 5,
+    history_repo: HistoryRepository = Depends(get_history_repo),
+):
+    """
+    Get the most recent verdicts for display on the homepage.
+    
+    Returns a simplified list of recent Q&A entries.
+    """
+    try:
+        entries = await history_repo.get_history(limit=limit, offset=0)
+        
+        return {
+            "success": True,
+            "verdicts": [
+                {
+                    "id": entry.id,
+                    "question": entry.question[:100] + "..." if len(entry.question) > 100 else entry.question,
+                    "verdict": entry.verdict[:150] + "..." if len(entry.verdict) > 150 else entry.verdict,
+                    "game_name": entry.game_name,
+                    "confidence": entry.confidence,
+                    "created_at": entry.created_at.isoformat() if entry.created_at else None,
+                }
+                for entry in entries
+            ],
+            "count": len(entries),
+        }
+    except Exception as e:
+        logger.error(f"Failed to get latest verdicts: {e}")
+        return {"success": False, "verdicts": [], "count": 0, "error": str(e)}
+
+
+# ============================================================================
 # Feedback Endpoints
 # ============================================================================
 
