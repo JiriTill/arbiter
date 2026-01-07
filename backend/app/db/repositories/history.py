@@ -114,7 +114,8 @@ class HistoryRepository(BaseRepository[AskHistory, AskHistoryCreate]):
             SELECT 
                 ah.*,
                 g.name as game_name,
-                g.slug as game_slug
+                g.slug as game_slug,
+                g.cover_image_url as cover_image_url
             FROM ask_history ah
             JOIN games g ON ah.game_id = g.id
             WHERE {where_clause}

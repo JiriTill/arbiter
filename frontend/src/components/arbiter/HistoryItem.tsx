@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { type HistoryEntry, type Confidence, formatRelativeTime } from "@/lib/mock-history";
 
 interface HistoryItemProps {
-    entry: HistoryEntry;
+    entry: HistoryEntry & { coverImageUrl?: string };
     onClick: () => void;
     className?: string;
 }
@@ -48,8 +48,22 @@ export function HistoryItem({ entry, onClick, className }: HistoryItemProps) {
                 className
             )}
         >
-            {/* Game Icon */}
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-muted to-muted/50 border border-border/50 mt-0.5 group-hover:border-emerald-500/30 transition-colors">
+            {/* Game Icon/Image */}
+            {entry.coverImageUrl ? (
+                <img
+                    src={entry.coverImageUrl}
+                    alt={entry.gameName}
+                    className="h-10 w-10 shrink-0 rounded-xl object-cover border border-border/50 group-hover:border-emerald-500/30 transition-colors"
+                    onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                    }}
+                />
+            ) : null}
+            <div className={cn(
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-muted to-muted/50 border border-border/50 mt-0.5 group-hover:border-emerald-500/30 transition-colors",
+                entry.coverImageUrl && "hidden"
+            )}>
                 <Gamepad2 className="h-5 w-5 text-muted-foreground group-hover:text-emerald-400 transition-colors" />
             </div>
 

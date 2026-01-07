@@ -629,6 +629,7 @@ class HistoryResponse(BaseModel):
     game_id: int
     game_name: str
     game_slug: str | None = None
+    cover_image_url: str | None = None
     edition: str | None
     question: str
     verdict: str
@@ -638,6 +639,7 @@ class HistoryResponse(BaseModel):
     response_time_ms: int | None
     model_used: str | None
     created_at: str
+
 
 
 class HistoryListResponse(BaseModel):
@@ -685,6 +687,7 @@ async def get_history(
                 game_id=entry.game_id,
                 game_name=entry.game_name,
                 game_slug=entry.game_slug,
+                cover_image_url=entry.cover_image_url,
                 edition=entry.edition,
                 question=entry.question,
                 verdict=entry.verdict,

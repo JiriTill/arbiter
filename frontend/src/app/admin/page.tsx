@@ -203,8 +203,8 @@ export default function AdminPage() {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === tab.id
-                                    ? "bg-card text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground"
+                                ? "bg-card text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
                                 }`}
                         >
                             <tab.icon className="h-4 w-4" />
@@ -657,8 +657,11 @@ function FeedbackTab({ addLog }: { addLog: (msg: string) => void }) {
         user_note: string | null;
         created_at: string;
         question?: string;
+        full_question?: string;
+        verdict?: string;
     }>>([]);
     const [loading, setLoading] = useState(true);
+    const [selectedId, setSelectedId] = useState<number | null>(null);
 
     useEffect(() => {
         async function load() {
@@ -688,6 +691,8 @@ function FeedbackTab({ addLog }: { addLog: (msg: string) => void }) {
         return <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     }
 
+    const selectedItem = feedback.find(f => f.id === selectedId);
+
     return (
         <div className="space-y-6">
             {/* Feedback Stats */}
@@ -714,36 +719,96 @@ function FeedbackTab({ addLog }: { addLog: (msg: string) => void }) {
                 </div>
             </div>
 
-            {/* Feedback List */}
-            <div className="bg-card border border-border rounded-xl overflow-hidden">
-                <div className="p-4 border-b border-border">
-                    <h3 className="font-semibold">Recent Feedback ({feedback.length})</h3>
-                </div>
-                <div className="divide-y divide-border max-h-96 overflow-y-auto">
-                    {feedback.length === 0 ? (
-                        <div className="p-8 text-center text-muted-foreground">
-                            No feedback received yet
-                        </div>
-                    ) : (
-                        feedback.slice(0, 50).map((f) => (
-                            <div key={f.id} className="p-4">
-                                <div className="flex items-center gap-2 mb-1">
-                                    {f.feedback_type === "helpful" ? (
-                                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                                    ) : (
-                                        <AlertCircle className="h-4 w-4 text-red-500" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Feedback List */}
+                <div className="bg-card border border-border rounded-xl overflow-hidden h-[600px] flex flex-col">
+                    <div className="p-4 border-b border-border bg-muted/20">
+                        <h3 className="font-semibold">Recent Feedback ({feedback.length})</h3>
+                    </div>
+                    <div className="divide-y divide-border overflow-y-auto flex-1">
+                        {feedback.length === 0 ? (
+                            <div className="p-8 text-center text-muted-foreground">
+                                No feedback received yet
+                            </div>
+                        ) : (
+                            feedback.slice(0, 100).map((f) => (
+                                <div
+                                    key={f.id}
+                                    className={`p-4 cursor-pointer transition-colors ${selectedId === f.id ? 'bg-primary/5' : 'hover:bg-muted/50'}`}
+                                    onClick={() => setSelectedId(f.id)}
+                                >
+                                    <div className="flex items-center gap-2 mb-2">
+                                        {f.feedback_type === "helpful" ? (
+                                            <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                        ) : (
+                                            <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                                        )}
+                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full capitalize ${f.feedback_type === 'helpful' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
+                                            }`}>
+                                            {f.feedback_type.replace("_", " ")}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground ml-auto">
+                                            {new Date(f.created_at).toLocaleDateString()}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm font-medium line-clamp-2 mb-1">{f.full_question || f.question}</p>
+                                    {f.user_note && (
+                                        <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded mt-1 italic">
+                                            "{f.user_note}"
+                                        </p>
                                     )}
-                                    <span className="text-sm font-medium capitalize">{f.feedback_type.replace("_", " ")}</span>
-                                    <span className="text-xs text-muted-foreground ml-auto">
-                                        {new Date(f.created_at).toLocaleString()}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                {/* Detail View */}
+                <div className="bg-card border border-border rounded-xl overflow-hidden h-[600px] flex flex-col">
+                    <div className="p-4 border-b border-border bg-muted/20">
+                        <h3 className="font-semibold">Feedback Details</h3>
+                    </div>
+                    <div className="p-6 overflow-y-auto flex-1">
+                        {selectedItem ? (
+                            <div className="space-y-6">
+                                <div className="flex items-center gap-3">
+                                    <span className={`text-sm font-bold px-3 py-1 rounded-full capitalize border ${selectedItem.feedback_type === 'helpful'
+                                            ? 'bg-green-500/10 text-green-500 border-green-500/20'
+                                            : 'bg-red-500/10 text-red-500 border-red-500/20'
+                                        }`}>
+                                        {selectedItem.feedback_type.replace("_", " ")}
+                                    </span>
+                                    <span className="text-sm text-muted-foreground">
+                                        {new Date(selectedItem.created_at).toLocaleString()}
                                     </span>
                                 </div>
-                                {f.user_note && (
-                                    <p className="text-sm text-muted-foreground ml-6">{f.user_note}</p>
+
+                                {selectedItem.user_note && (
+                                    <div className="bg-muted/30 p-4 rounded-lg border border-border">
+                                        <h4 className="text-xs font-bold uppercase text-muted-foreground mb-2">User Note</h4>
+                                        <p className="text-sm italic">"{selectedItem.user_note}"</p>
+                                    </div>
                                 )}
+
+                                <div>
+                                    <h4 className="text-xs font-bold uppercase text-muted-foreground mb-2">Question</h4>
+                                    <p className="text-lg font-medium">{selectedItem.full_question || selectedItem.question}</p>
+                                </div>
+
+                                <div>
+                                    <h4 className="text-xs font-bold uppercase text-muted-foreground mb-2">Verdict</h4>
+                                    <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-lg">
+                                        <p className="whitespace-pre-wrap">{selectedItem.verdict || "No verdict recorded"}</p>
+                                    </div>
+                                </div>
                             </div>
-                        ))
-                    )}
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
+                                <MessageSquare className="h-12 w-12 mb-4 opacity-20" />
+                                <p>Select a feedback item to view details</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

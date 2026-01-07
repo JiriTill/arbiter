@@ -399,10 +399,11 @@ async def sync_bgg_images():
     
     This endpoint:
     1. Gets all games with bgg_id set
-    2. Fetches image URLs from BGG XML API
+    2. Fetches image URLs from BGG XML API (concurrently with rate limiting)
     3. Updates the database with the fetched URLs
     """
     import httpx
+    import asyncio
     import xml.etree.ElementTree as ET
     from app.db.connection import get_async_connection
     
@@ -417,53 +418,70 @@ async def sync_bgg_images():
             
             logger.info(f"Found {len(rows)} games with BGG IDs")
             
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                for row in rows:
+            # Semaphore to limit concurrency (BGG rate limits)
+            sem = asyncio.Semaphore(4)
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                
+                async def process_game(row):
                     game_id, name, bgg_id = row["id"], row["name"], row["bgg_id"]
-                    
-                    try:
-                        # Fetch from BGG API
-                        bgg_url = f"https://boardgamegeek.com/xmlapi2/thing?id={bgg_id}"
-                        response = await client.get(bgg_url)
-                        
-                        if response.status_code != 200:
-                            errors.append({"game": name, "error": f"BGG returned {response.status_code}"})
-                            continue
-                        
-                        # Parse XML
-                        root = ET.fromstring(response.content)
-                        image_elem = root.find(".//image")
-                        thumbnail_elem = root.find(".//thumbnail")
-                        
-                        # Prefer thumbnail for smaller size, fallback to full image
-                        image_url = None
-                        if thumbnail_elem is not None and thumbnail_elem.text:
-                            image_url = thumbnail_elem.text
-                        elif image_elem is not None and image_elem.text:
-                            image_url = image_elem.text
-                        
-                        if not image_url:
-                            errors.append({"game": name, "error": "No image found in BGG response"})
-                            continue
-                        
-                        # Update database
+                    async with sem:
+                        try:
+                            # Fetch from BGG API
+                            bgg_url = f"https://boardgamegeek.com/xmlapi2/thing?id={bgg_id}"
+                            response = await client.get(bgg_url)
+                            
+                            if response.status_code != 200:
+                                return {"error": f"BGG returned {response.status_code}", "game": name}
+                            
+                            # Parse XML
+                            root = ET.fromstring(response.content)
+                            image_elem = root.find(".//image")
+                            thumbnail_elem = root.find(".//thumbnail")
+                            
+                            # Prefer thumbnail for smaller size, fallback to full image
+                            image_url = None
+                            if thumbnail_elem is not None and thumbnail_elem.text:
+                                image_url = thumbnail_elem.text
+                            elif image_elem is not None and image_elem.text:
+                                image_url = image_elem.text
+                            
+                            if not image_url:
+                                return {"error": "No image found in BGG response", "game": name}
+                            
+                            return {
+                                "success": True,
+                                "game_id": game_id,
+                                "game": name,
+                                "bgg_id": bgg_id,
+                                "image_url": image_url
+                            }
+                            
+                        except ET.ParseError as e:
+                            return {"error": f"XML parse error: {str(e)}", "game": name}
+                        except Exception as e:
+                            # Catch timeout and other errors
+                            return {"error": str(e), "game": name}
+
+                # Run all tasks
+                tasks = [process_game(row) for row in rows]
+                batch_results = await asyncio.gather(*tasks)
+                
+                # Process results and update DB
+                for res in batch_results:
+                    if "error" in res:
+                        errors.append(res)
+                    else:
                         await cur.execute(
                             "UPDATE games SET cover_image_url = %s WHERE id = %s",
-                            (image_url, game_id)
+                            (res["image_url"], res["game_id"])
                         )
-                        
                         results.append({
-                            "game": name,
-                            "bgg_id": bgg_id,
-                            "image_url": image_url[:60] + "..." if len(image_url) > 60 else image_url
+                            "game": res["game"],
+                            "bgg_id": res["bgg_id"],
+                            "image_url": res["image_url"][:60] + "..." if len(res["image_url"]) > 60 else res["image_url"]
                         })
-                        
-                        logger.info(f"Updated {name} with image from BGG")
-                        
-                    except ET.ParseError as e:
-                        errors.append({"game": name, "error": f"XML parse error: {str(e)}"})
-                    except Exception as e:
-                        errors.append({"game": name, "error": str(e)})
+                        logger.info(f"Updated {res['game']} with image from BGG")
                 
             await conn.commit()
     
@@ -682,7 +700,8 @@ async def get_all_feedback(
                         f.feedback_type,
                         f.user_note,
                         f.created_at,
-                        h.question
+                        h.question,
+                        h.verdict
                     FROM answer_feedback f
                     LEFT JOIN ask_history h ON f.ask_history_id = h.id
                     ORDER BY f.created_at DESC
@@ -697,6 +716,8 @@ async def get_all_feedback(
                         "user_note": row["user_note"],
                         "created_at": row["created_at"].isoformat() if row["created_at"] else None,
                         "question": row["question"][:100] + "..." if row["question"] and len(row["question"]) > 100 else row["question"],
+                        "full_question": row["question"],
+                        "verdict": row["verdict"],
                     }
                     for row in rows
                 ]

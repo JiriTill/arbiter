@@ -161,6 +161,7 @@ export interface HistoryEntry {
     game_id: number;
     game_name: string;
     game_slug: string | null;
+    cover_image_url: string | null;
     edition: string | null;
     question: string;
     verdict: string;

@@ -228,6 +228,8 @@ class AskHistoryWithGame(AskHistory):
     """History with game info."""
     game_name: str
     game_slug: str
+    cover_image_url: str | None = None
+
 
 
 # ============================================================================

@@ -21,6 +21,7 @@ interface HistoryEntry {
     sourceType: "rulebook" | "faq" | "errata";
     sourceEdition: string;
     sourceUrl?: string;
+    coverImageUrl?: string;
     superseded?: {
         oldQuote: string;
         oldPage: number;
@@ -46,6 +47,7 @@ function convertApiEntry(entry: ApiHistoryEntry): HistoryEntry {
         quoteVerified: firstCitation?.verified || false,
         sourceType: (firstCitation?.source_type as "rulebook" | "faq" | "errata") || "rulebook",
         sourceEdition: entry.edition || "Unknown",
+        coverImageUrl: entry.cover_image_url || undefined,
     };
 }
 
