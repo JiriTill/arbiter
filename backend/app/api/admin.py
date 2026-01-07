@@ -685,7 +685,7 @@ async def get_feedback_summary(
                 """)
                 rows = await cur.fetchall()
                 
-                counts = {row["feedback_type"]: row["count"] for row in rows}
+                counts = {row[0]: row[1] for row in rows}
                 
                 return {
                     "helpful": counts.get("helpful", 0),
@@ -728,13 +728,13 @@ async def get_all_feedback(
                 
                 items = [
                     {
-                        "id": row["id"],
-                        "feedback_type": row["feedback_type"],
-                        "user_note": row["user_note"],
-                        "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-                        "question": row["question"][:100] + "..." if row["question"] and len(row["question"]) > 100 else row["question"],
-                        "full_question": row["question"],
-                        "verdict": row["verdict"],
+                        "id": row[0],
+                        "feedback_type": row[1],
+                        "user_note": row[2],
+                        "created_at": row[3].isoformat() if row[3] else None,
+                        "question": row[4][:100] + "..." if row[4] and len(row[4]) > 100 else row[4],
+                        "full_question": row[4],
+                        "verdict": row[5],
                     }
                     for row in rows
                 ]
