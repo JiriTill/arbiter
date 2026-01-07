@@ -419,23 +419,40 @@ async def sync_bgg_images():
             logger.info(f"Found {len(rows)} games with BGG IDs")
             
             # Semaphore to limit concurrency (BGG rate limits)
-            sem = asyncio.Semaphore(4)
+            sem = asyncio.Semaphore(2)  # Lower concurrency to avoid blocking
 
-            # Add Browser User-Agent to avoid 401/403
+            # Detailed browser headers
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": "https://boardgamegeek.com/",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1"
             }
             
-            async with httpx.AsyncClient(timeout=30.0, headers=headers, follow_redirects=True) as client:
+            async with httpx.AsyncClient(timeout=45.0, headers=headers, follow_redirects=True) as client:
                 
+                async def fetch_bgg(bgg_id, use_v1=False):
+                    url = f"https://boardgamegeek.com/xmlapi/boardgame/{bgg_id}" if use_v1 else f"https://boardgamegeek.com/xmlapi2/thing?id={bgg_id}"
+                    return await client.get(url)
+
                 async def process_game(row):
                     game_id, name, bgg_id = row[0], row[1], row[2]
                     async with sem:
                         try:
-                            # Fetch from BGG API
-                            bgg_url = f"https://boardgamegeek.com/xmlapi2/thing?id={bgg_id}"
-                            response = await client.get(bgg_url)
+                            # Random delay to look human
+                            import random
+                            await asyncio.sleep(random.uniform(0.5, 2.0))
+                            
+                            # Try v2
+                            response = await fetch_bgg(bgg_id)
+                            
+                            # If blocked, try v1
+                            if response.status_code in [401, 403, 429]:
+                                logger.warning(f"BGG v2 blocked ({response.status_code}) for {name}, trying v1...")
+                                await asyncio.sleep(2)
+                                response = await fetch_bgg(bgg_id, use_v1=True)
                             
                             if response.status_code != 200:
                                 return {"error": f"BGG returned {response.status_code}", "game": name}
@@ -443,28 +460,29 @@ async def sync_bgg_images():
                             # Parse XML
                             root = ET.fromstring(response.content)
                             
-                            # Check what we got
-                            # logger.info(f"BGG Response for {name}: {response.content[:100]}")
+                            # Log first 100 bytes for debugging if needed
+                            # logger.info(f"Response: {response.content[:100]}")
                             
-                            image_elem = root.find(".//image")
-                            thumbnail_elem = root.find(".//thumbnail")
-                            
-                            # Prefer thumbnail for smaller size, fallback to full image
                             image_url = None
+                            
+                            # v2 structure vs v1 structure
+                            # v2: <item><thumbnail>...</thumbnail><image>...</image></item>
+                            # v1: <boardgame><thumbnail>...</thumbnail><image>...</image></boardgame>
+                            
+                            thumbnail_elem = root.find(".//thumbnail")
+                            image_elem = root.find(".//image")
+                            
                             if thumbnail_elem is not None and thumbnail_elem.text:
                                 image_url = thumbnail_elem.text
                             elif image_elem is not None and image_elem.text:
                                 image_url = image_elem.text
                             
+                            if not image_url:
+                                return {"error": "No image found in BGG response", "game": name}
+                            
                             # Ensure absolute URL
                             if image_url and not image_url.startswith("http"):
                                 image_url = f"https:{image_url}" if image_url.startswith("//") else f"https://boardgamegeek.com{image_url}"
-                            
-                            # Log the extracted URL to debug
-                            # logger.info(f"Extracted URL for {name}: {image_url}")
-                            
-                            if not image_url:
-                                return {"error": "No image found in BGG response", "game": name}
                             
                             return {
                                 "success": True,
@@ -477,7 +495,6 @@ async def sync_bgg_images():
                         except ET.ParseError as e:
                             return {"error": f"XML parse error: {str(e)}", "game": name}
                         except Exception as e:
-                            # Catch timeout and other errors
                             return {"error": str(e), "game": name}
 
                 # Run all tasks
