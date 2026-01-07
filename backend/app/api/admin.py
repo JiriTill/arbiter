@@ -626,3 +626,83 @@ async def get_ocr_status():
         return check_tesseract_installation()
     except Exception as e:
         return {"installed": False, "error": str(e)}
+
+
+# =============================================================================
+# Analytics Endpoints
+# =============================================================================
+
+@router.get("/analytics/feedback-summary")
+async def get_feedback_summary(
+    feedback_repo: FeedbackRepository = Depends(get_feedback_repo),
+):
+    """Get feedback statistics summary."""
+    try:
+        from app.db.connection import get_async_connection
+        
+        async with get_async_connection() as conn:
+            async with conn.cursor() as cur:
+                # Count by feedback type
+                await cur.execute("""
+                    SELECT feedback_type, COUNT(*) as count
+                    FROM answer_feedback
+                    GROUP BY feedback_type
+                """)
+                rows = await cur.fetchall()
+                
+                counts = {row["feedback_type"]: row["count"] for row in rows}
+                
+                return {
+                    "helpful": counts.get("helpful", 0),
+                    "negative": sum(v for k, v in counts.items() if k != "helpful"),
+                    "wrong_quote": counts.get("wrong_quote", 0),
+                    "wrong_interpretation": counts.get("wrong_interpretation", 0),
+                    "missing_context": counts.get("missing_context", 0),
+                    "total": sum(counts.values()),
+                }
+    except Exception as e:
+        logger.error(f"Failed to get feedback summary: {e}")
+        return {"helpful": 0, "negative": 0, "total": 0}
+
+
+@router.get("/analytics/feedback")
+async def get_all_feedback(
+    limit: int = 100,
+    offset: int = 0,
+):
+    """Get all feedback with details for admin dashboard."""
+    try:
+        from app.db.connection import get_async_connection
+        
+        async with get_async_connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("""
+                    SELECT 
+                        f.id,
+                        f.feedback_type,
+                        f.user_note,
+                        f.created_at,
+                        h.question
+                    FROM answer_feedback f
+                    LEFT JOIN ask_history h ON f.ask_history_id = h.id
+                    ORDER BY f.created_at DESC
+                    LIMIT %s OFFSET %s
+                """, (limit, offset))
+                rows = await cur.fetchall()
+                
+                items = [
+                    {
+                        "id": row["id"],
+                        "feedback_type": row["feedback_type"],
+                        "user_note": row["user_note"],
+                        "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+                        "question": row["question"][:100] + "..." if row["question"] and len(row["question"]) > 100 else row["question"],
+                    }
+                    for row in rows
+                ]
+                
+                return {"items": items, "count": len(items)}
+    except Exception as e:
+        logger.error(f"Failed to get feedback: {e}")
+        return {"items": [], "count": 0}
+

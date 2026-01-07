@@ -1,8 +1,29 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import {
+    BarChart3,
+    Users,
+    MessageSquare,
+    BookOpen,
+    Settings,
+    Database,
+    RefreshCw,
+    ThumbsUp,
+    ThumbsDown,
+    TrendingUp,
+    Calendar,
+    Image,
+    AlertCircle,
+    CheckCircle2,
+    Loader2
+} from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+// ============================================================================
+// Types
+// ============================================================================
 
 interface Game {
     id: number;
@@ -24,34 +45,46 @@ interface Source {
     last_ingested_at: string | null;
 }
 
+interface DashboardStats {
+    total_questions: number;
+    total_games: number;
+    total_sources: number;
+    feedback_helpful: number;
+    feedback_negative: number;
+    questions_today: number;
+    questions_this_week: number;
+}
+
+// ============================================================================
+// Tab Navigation
+// ============================================================================
+
+type TabId = "dashboard" | "games" | "feedback" | "maintenance";
+
+const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
+    { id: "dashboard", label: "Dashboard", icon: BarChart3 },
+    { id: "games", label: "Games & Sources", icon: BookOpen },
+    { id: "feedback", label: "Feedback", icon: MessageSquare },
+    { id: "maintenance", label: "Maintenance", icon: Settings },
+];
+
+// ============================================================================
+// Main Component
+// ============================================================================
+
 export default function AdminPage() {
+    const [activeTab, setActiveTab] = useState<TabId>("dashboard");
     const [games, setGames] = useState<Game[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [stats, setStats] = useState<DashboardStats | null>(null);
+    const [logs, setLogs] = useState<string[]>([]);
 
-    // Form states
-    const [showGameForm, setShowGameForm] = useState(false);
-    const [showUploadForm, setShowUploadForm] = useState(false);
-    const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
-
-    // New game form
-    const [newGame, setNewGame] = useState({
-        name: "",
-        slug: "",
-        bgg_id: "",
-        cover_image_url: "",
-    });
-
-    // Upload form
-    const [uploadData, setUploadData] = useState({
-        game_id: "",
-        edition: "1st Edition",
-        source_type: "rulebook",
-        needs_ocr: false,
-    });
-    const [uploadFile, setUploadFile] = useState<File | null>(null);
-    const [uploading, setUploading] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState<string>("");
+    const addLog = useCallback((msg: string) => {
+        const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+        setLogs(prev => [`[${timestamp}] ${msg}`, ...prev].slice(0, 100));
+        console.log(msg);
+    }, []);
 
     const fetchGames = useCallback(async () => {
         try {
@@ -66,9 +99,321 @@ export default function AdminPage() {
         }
     }, []);
 
+    const fetchStats = useCallback(async () => {
+        try {
+            // Fetch multiple endpoints to build stats
+            const [historyRes, feedbackRes] = await Promise.all([
+                fetch(`${API_BASE_URL}/history?limit=1000`),
+                fetch(`${API_BASE_URL}/admin/analytics/feedback-summary`).catch(() => null),
+            ]);
+
+            let totalQuestions = 0;
+            let questionsToday = 0;
+            let questionsThisWeek = 0;
+
+            if (historyRes.ok) {
+                const historyData = await historyRes.json();
+                totalQuestions = historyData.total || historyData.items?.length || 0;
+
+                // Calculate time-based stats
+                const now = new Date();
+                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+                historyData.items?.forEach((item: { created_at: string }) => {
+                    const date = new Date(item.created_at);
+                    if (date >= today) questionsToday++;
+                    if (date >= weekAgo) questionsThisWeek++;
+                });
+            }
+
+            let feedbackHelpful = 0;
+            let feedbackNegative = 0;
+
+            if (feedbackRes?.ok) {
+                const feedbackData = await feedbackRes.json();
+                feedbackHelpful = feedbackData.helpful || 0;
+                feedbackNegative = feedbackData.negative || 0;
+            }
+
+            setStats({
+                total_questions: totalQuestions,
+                total_games: games.length,
+                total_sources: games.reduce((acc, g) => acc + (g.sources?.length || 0), 0),
+                feedback_helpful: feedbackHelpful,
+                feedback_negative: feedbackNegative,
+                questions_today: questionsToday,
+                questions_this_week: questionsThisWeek,
+            });
+        } catch (err) {
+            console.error("Failed to fetch stats:", err);
+        }
+    }, [games]);
+
     useEffect(() => {
         fetchGames();
     }, [fetchGames]);
+
+    useEffect(() => {
+        if (games.length > 0) {
+            fetchStats();
+        }
+    }, [games, fetchStats]);
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="flex items-center gap-3 text-xl text-primary">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                    Loading Arbiter Admin...
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-background text-foreground">
+            {/* Header */}
+            <header className="border-b border-border bg-card sticky top-0 z-50">
+                <div className="max-w-7xl mx-auto px-6 py-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-emerald-500 flex items-center justify-center text-white font-bold text-lg">
+                                A
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-bold">Admin Dashboard</h1>
+                                <p className="text-xs text-muted-foreground">The Arbiter Management</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span className="px-2 py-1 bg-emerald-500/10 text-emerald-500 rounded text-xs">
+                                Connected
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div className="max-w-7xl mx-auto px-6 py-6">
+                {/* Tab Navigation */}
+                <nav className="flex gap-1 mb-6 bg-muted/50 p-1 rounded-lg w-fit">
+                    {TABS.map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === tab.id
+                                    ? "bg-card text-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground"
+                                }`}
+                        >
+                            <tab.icon className="h-4 w-4" />
+                            {tab.label}
+                        </button>
+                    ))}
+                </nav>
+
+                {error && (
+                    <div className="bg-destructive/20 border border-destructive text-destructive-foreground p-4 rounded-lg mb-6 flex items-center gap-2">
+                        <AlertCircle className="h-5 w-5" />
+                        {error}
+                    </div>
+                )}
+
+                {/* Tab Content */}
+                {activeTab === "dashboard" && (
+                    <DashboardTab stats={stats} games={games} onRefresh={fetchStats} />
+                )}
+                {activeTab === "games" && (
+                    <GamesTab games={games} onRefresh={fetchGames} addLog={addLog} />
+                )}
+                {activeTab === "feedback" && (
+                    <FeedbackTab addLog={addLog} />
+                )}
+                {activeTab === "maintenance" && (
+                    <MaintenanceTab addLog={addLog} onRefresh={fetchGames} />
+                )}
+            </div>
+
+            {/* System Logs Panel */}
+            <div className="fixed bottom-16 left-0 right-0 bg-black/95 text-green-400 text-xs font-mono p-2 h-32 overflow-y-auto border-t border-green-500/30 z-40">
+                <div className="max-w-7xl mx-auto px-6">
+                    <div className="flex justify-between items-center mb-1 sticky top-0 bg-black/50 backdrop-blur">
+                        <span className="font-bold flex items-center gap-2">
+                            <Database className="h-3 w-3" />
+                            SYSTEM LOGS
+                        </span>
+                        <button onClick={() => setLogs([])} className="text-[10px] text-gray-500 hover:text-white">CLEAR</button>
+                    </div>
+                    <div className="space-y-0.5">
+                        {logs.length === 0 && <div className="text-gray-600 italic">Ready. Logs will appear here...</div>}
+                        {logs.map((log, i) => (
+                            <div key={i} className="whitespace-pre-wrap">{log}</div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ============================================================================
+// Dashboard Tab
+// ============================================================================
+
+function DashboardTab({
+    stats,
+    games,
+    onRefresh
+}: {
+    stats: DashboardStats | null;
+    games: Game[];
+    onRefresh: () => void;
+}) {
+    return (
+        <div className="space-y-6">
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard
+                    title="Total Questions"
+                    value={stats?.total_questions || 0}
+                    icon={MessageSquare}
+                    color="emerald"
+                    subtitle={`${stats?.questions_today || 0} today`}
+                />
+                <StatCard
+                    title="Games"
+                    value={stats?.total_games || 0}
+                    icon={BookOpen}
+                    color="blue"
+                    subtitle={`${stats?.total_sources || 0} sources`}
+                />
+                <StatCard
+                    title="Helpful Feedback"
+                    value={stats?.feedback_helpful || 0}
+                    icon={ThumbsUp}
+                    color="green"
+                    subtitle="Positive votes"
+                />
+                <StatCard
+                    title="Negative Feedback"
+                    value={stats?.feedback_negative || 0}
+                    icon={ThumbsDown}
+                    color="red"
+                    subtitle="Needs improvement"
+                />
+            </div>
+
+            {/* Activity Chart Placeholder */}
+            <div className="bg-card border border-border rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-emerald-500" />
+                        Weekly Activity
+                    </h3>
+                    <button
+                        onClick={onRefresh}
+                        className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
+                    >
+                        <RefreshCw className="h-3 w-3" />
+                        Refresh
+                    </button>
+                </div>
+                <div className="h-48 flex items-center justify-center text-muted-foreground">
+                    <div className="text-center">
+                        <Calendar className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">Questions this week: {stats?.questions_this_week || 0}</p>
+                        <p className="text-xs mt-1">Chart visualization coming soon</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Recent Games */}
+            <div className="bg-card border border-border rounded-xl p-6">
+                <h3 className="font-semibold mb-4">Game Library ({games.length})</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    {games.slice(0, 6).map((game) => (
+                        <div key={game.id} className="bg-muted/50 rounded-lg p-3 text-center">
+                            {game.cover_image_url ? (
+                                <img
+                                    src={game.cover_image_url}
+                                    alt={game.name}
+                                    className="w-12 h-12 rounded-lg object-cover mx-auto mb-2"
+                                />
+                            ) : (
+                                <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold mx-auto mb-2">
+                                    {game.name.charAt(0)}
+                                </div>
+                            )}
+                            <p className="text-xs font-medium truncate">{game.name}</p>
+                            <p className="text-xs text-muted-foreground">{game.sources?.length || 0} sources</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function StatCard({
+    title,
+    value,
+    icon: Icon,
+    color,
+    subtitle
+}: {
+    title: string;
+    value: number;
+    icon: React.ElementType;
+    color: "emerald" | "blue" | "green" | "red";
+    subtitle: string;
+}) {
+    const colorClasses = {
+        emerald: "bg-emerald-500/10 text-emerald-500",
+        blue: "bg-blue-500/10 text-blue-500",
+        green: "bg-green-500/10 text-green-500",
+        red: "bg-red-500/10 text-red-500",
+    };
+
+    return (
+        <div className="bg-card border border-border rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-muted-foreground">{title}</span>
+                <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
+                    <Icon className="h-4 w-4" />
+                </div>
+            </div>
+            <p className="text-2xl font-bold">{value.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+        </div>
+    );
+}
+
+// ============================================================================
+// Games Tab (keeping original functionality)
+// ============================================================================
+
+function GamesTab({
+    games,
+    onRefresh,
+    addLog
+}: {
+    games: Game[];
+    onRefresh: () => void;
+    addLog: (msg: string) => void;
+}) {
+    const [showGameForm, setShowGameForm] = useState(false);
+    const [showUploadForm, setShowUploadForm] = useState(false);
+    const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
+    const [newGame, setNewGame] = useState({ name: "", slug: "", bgg_id: "", cover_image_url: "" });
+    const [uploadData, setUploadData] = useState({ game_id: "", edition: "1st Edition", source_type: "rulebook", needs_ocr: false });
+    const [uploadFile, setUploadFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState("");
+
+    const generateSlug = (name: string) => {
+        return name.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").trim();
+    };
 
     const handleCreateGame = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -79,30 +424,21 @@ export default function AdminPage() {
             if (newGame.bgg_id) formData.append("bgg_id", newGame.bgg_id);
             if (newGame.cover_image_url) formData.append("cover_image_url", newGame.cover_image_url);
 
-            const res = await fetch(`${API_BASE_URL}/admin/games`, {
-                method: "POST",
-                body: formData,
-            });
+            const res = await fetch(`${API_BASE_URL}/admin/games`, { method: "POST", body: formData });
+            if (!res.ok) throw new Error((await res.json()).detail || "Failed");
 
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.detail || "Failed to create game");
-            }
-
+            addLog(`✅ Created game: ${newGame.name}`);
             setShowGameForm(false);
             setNewGame({ name: "", slug: "", bgg_id: "", cover_image_url: "" });
-            fetchGames();
+            onRefresh();
         } catch (err) {
-            alert(err instanceof Error ? err.message : "Failed to create game");
+            addLog(`❌ Failed to create game: ${err}`);
         }
     };
 
     const handleUpload = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!uploadFile) {
-            alert("Please select a PDF file");
-            return;
-        }
+        if (!uploadFile) return;
 
         setUploading(true);
         setUploadProgress("Uploading PDF...");
@@ -115,661 +451,428 @@ export default function AdminPage() {
             formData.append("needs_ocr", String(uploadData.needs_ocr));
             formData.append("file", uploadFile);
 
-            const res = await fetch(`${API_BASE_URL}/admin/sources/upload`, {
-                method: "POST",
-                body: formData,
-            });
-
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.detail || "Upload failed");
-            }
+            const res = await fetch(`${API_BASE_URL}/admin/sources/upload`, { method: "POST", body: formData });
+            if (!res.ok) throw new Error((await res.json()).detail || "Upload failed");
 
             const result = await res.json();
-            setUploadProgress(`✅ Uploaded! ${result.file_size_mb} MB. Source ID: ${result.source.id}`);
+            addLog(`✅ Uploaded ${uploadFile.name} (${result.file_size_mb} MB)`);
+            setUploadProgress("✅ Upload complete!");
 
-            // Trigger processing immediately if needed
-            if (uploadData.needs_ocr) {
-                setUploadProgress("Triggering OCR processing...");
-                await handleProcess(result.source.id);
-                setUploadProgress("✅ Uploaded & Processing started!");
-            }
-
-            // Reset form after delay
             setTimeout(() => {
                 setShowUploadForm(false);
                 setUploadFile(null);
                 setUploadProgress("");
-                fetchGames();
-            }, 2000);
-
+                onRefresh();
+            }, 1500);
         } catch (err) {
-            setUploadProgress(`❌ Error: ${err instanceof Error ? err.message : "Upload failed"}`);
+            addLog(`❌ Upload failed: ${err}`);
+            setUploadProgress(`❌ Error: ${err}`);
         } finally {
             setUploading(false);
         }
     };
 
-    const handleProcess = async (sourceId: number) => {
-        try {
-            const res = await fetch(`${API_BASE_URL}/admin/sources/${sourceId}/process`, {
-                method: "POST",
-            });
-
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.detail || "Failed to start processing");
-            }
-
-            const data = await res.json();
-
-            // Refresh games to update status
-            fetchGames();
-
-            return data.job_id;
-        } catch (err) {
-            addLog(`Processing trigger failed for source ${sourceId}: ${err instanceof Error ? err.message : "Unknown error"}`);
-            return null;
-        }
-    };
-
-    const [logs, setLogs] = useState<string[]>([]);
-
-    const addLog = (msg: string) => {
-        setLogs(prev => [`[${new Date().toISOString().split('T')[1].split('.')[0]}] ${msg}`, ...prev].slice(0, 50));
-        console.log(msg); // Also real console
-    };
-
-    const handleDebugUrls = async () => {
-        try {
-            const res = await fetch(`${API_BASE_URL}/admin/maintenance/urls`);
-            const data = await res.json();
-            const msg = data.map((g: any) => `${g.name}: ${g.url}`).join('\n\n');
-            addLog(`Debug URLs:\n${msg}`);
-        } catch (e) {
-            addLog("Failed to fetch URLs");
-        }
-    };
-
-    const handleFixImages = async () => {
-        if (!confirm("RESET images to original Seed Data URLs? (This fixes '400 Bad Request' errors)")) return;
-        try {
-            const res = await fetch(`${API_BASE_URL}/admin/maintenance/reset-images`, { method: "POST" });
-            const data = await res.json();
-            addLog(data.message);
-            fetchGames();
-        } catch (e) {
-            addLog("Failed to reset images");
-        }
-    };
-
-    const handleDeleteSource = async (sourceId: number) => {
-        try {
-            const res = await fetch(`${API_BASE_URL}/admin/sources/${sourceId}`, { method: "DELETE" });
-            if (!res.ok) throw new Error("Failed");
-            fetchGames();
-        } catch (e) {
-            alert("Error deleting source");
-        }
-    };
-
-    const generateSlug = (name: string) => {
-        return name
-            .toLowerCase()
-            .replace(/[^a-z0-9\s-]/g, "")
-            .replace(/\s+/g, "-")
-            .replace(/-+/g, "-")
-            .trim();
-    };
-
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-background flex items-center justify-center">
-                <div className="text-xl text-primary animate-pulse">Loading Arbiter Admin...</div>
-            </div>
-        );
-    }
-
     return (
-        <div className="min-h-screen bg-background text-foreground font-sans">
-            <div className="max-w-6xl mx-auto p-6">
-                {/* Header Section */}
-                <div className="flex items-center justify-between mb-8 bg-card p-6 rounded-xl border border-border shadow-sm">
-                    <div>
-                        <h1 className="text-3xl font-bold text-primary">🎲 Admin Dashboard</h1>
-                        <p className="text-muted-foreground mt-1">Manage games and rulebooks</p>
-                    </div>
-                    <div className="flex gap-2 flex-wrap">
-                        <button
-                            onClick={async () => {
-                                try {
-                                    const res = await fetch(`${API_BASE_URL}/admin/maintenance/failed-jobs`);
-                                    const data = await res.json();
-                                    addLog(`Failed jobs: ${data.failed_count}`);
-                                    if (data.jobs && data.jobs.length > 0) {
-                                        data.jobs.forEach((job: any) => {
-                                            addLog(`❌ Job ${job.job_id}: ${job.exc_info || job.error || 'Unknown error'}`);
-                                        });
-                                    } else {
-                                        addLog(`✅ No failed jobs found`);
-                                    }
-                                } catch (e) {
-                                    addLog(`Error fetching failed jobs: ${e}`);
-                                }
-                            }}
-                            className="px-3 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg text-sm transition"
-                        >
-                            🔴 Failed Jobs
-                        </button>
-                        <button
-                            onClick={handleDebugUrls}
-                            className="px-3 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-sm transition"
-                        >
-                            📋 Debug URLs
-                        </button>
-                        <button
-                            onClick={async () => {
-                                try {
-                                    const res = await fetch(`${API_BASE_URL}/admin/maintenance/ocr-status`);
-                                    const data = await res.json();
-                                    if (data.ocr_available) {
-                                        addLog(`✅ Cloud OCR: AVAILABLE (${data.details?.credentials_source || 'configured'})`);
-                                    } else {
-                                        addLog(`❌ Cloud OCR: NOT AVAILABLE`);
-                                        addLog(`   Reason: ${data.details?.error || 'Unknown'}`);
-                                        addLog(`   To fix: Add GOOGLE_APPLICATION_CREDENTIALS_JSON to Railway`);
-                                    }
-                                } catch (e) {
-                                    addLog(`❌ OCR status check failed: ${e}`);
-                                }
-                            }}
-                            className="px-3 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-lg text-sm transition"
-                        >
-                            🔍 OCR Status
-                        </button>
-                        <button
-                            onClick={handleFixImages}
-                            className="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-sm transition"
-                        >
-                            🔧 Fix Images
-                        </button>
-                        <button
-                            onClick={() => setShowGameForm(true)}
-                            className="px-3 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm transition"
-                        >
-                            <span>+</span> Add Game
-                        </button>
-                        <button
-                            onClick={() => setShowUploadForm(true)}
-                            className="px-4 py-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-lg flex items-center gap-2 transition"
-                        >
-                            <span>📄</span> Upload PDF
-                        </button>
-                    </div>
+        <div className="space-y-6">
+            {/* Actions Bar */}
+            <div className="flex gap-2">
+                <button
+                    onClick={() => setShowGameForm(true)}
+                    className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition flex items-center gap-2"
+                >
+                    + Add Game
+                </button>
+                <button
+                    onClick={() => setShowUploadForm(true)}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition flex items-center gap-2"
+                >
+                    📄 Upload PDF
+                </button>
+            </div>
+
+            {/* Add Game Form */}
+            {showGameForm && (
+                <div className="bg-card border border-border rounded-xl p-6">
+                    <h2 className="text-lg font-semibold mb-4">Add New Game</h2>
+                    <form onSubmit={handleCreateGame} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm text-muted-foreground mb-1">Game Name</label>
+                                <input
+                                    type="text"
+                                    value={newGame.name}
+                                    onChange={(e) => setNewGame({ ...newGame, name: e.target.value, slug: generateSlug(e.target.value) })}
+                                    className="w-full px-4 py-2 bg-background border border-border rounded-lg"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-muted-foreground mb-1">BGG ID</label>
+                                <input
+                                    type="number"
+                                    value={newGame.bgg_id}
+                                    onChange={(e) => setNewGame({ ...newGame, bgg_id: e.target.value })}
+                                    className="w-full px-4 py-2 bg-background border border-border rounded-lg"
+                                    placeholder="e.g., 237182"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <button type="submit" className="px-4 py-2 bg-emerald-500 text-white rounded-lg">Create</button>
+                            <button type="button" onClick={() => setShowGameForm(false)} className="px-4 py-2 bg-muted text-muted-foreground rounded-lg">Cancel</button>
+                        </div>
+                    </form>
                 </div>
+            )}
 
-                {error && (
-                    <div className="bg-destructive/20 border border-destructive text-destructive-foreground p-4 rounded-lg mb-6">
-                        {error}
-                    </div>
-                )}
-
-                {/* Add Game Form */}
-                {showGameForm && (
-                    <div className="bg-card border border-border rounded-xl p-6 mb-6">
-                        <h2 className="text-xl font-semibold mb-4">Add New Game</h2>
-                        <form onSubmit={handleCreateGame} className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm text-muted-foreground mb-1">Game Name</label>
-                                    <input
-                                        type="text"
-                                        value={newGame.name}
-                                        onChange={(e) => {
-                                            setNewGame({
-                                                ...newGame,
-                                                name: e.target.value,
-                                                slug: generateSlug(e.target.value),
-                                            });
-                                        }}
-                                        placeholder="Lord of the Rings: Fate of the Fellowship"
-                                        className="w-full px-4 py-2 bg-input border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm text-muted-foreground mb-1">Slug</label>
-                                    <input
-                                        type="text"
-                                        value={newGame.slug}
-                                        onChange={(e) => setNewGame({ ...newGame, slug: e.target.value })}
-                                        placeholder="lotr-fate-of-fellowship"
-                                        className="w-full px-4 py-2 bg-input border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm text-muted-foreground mb-1">BGG ID (optional)</label>
-                                    <input
-                                        type="number"
-                                        value={newGame.bgg_id}
-                                        onChange={(e) => setNewGame({ ...newGame, bgg_id: e.target.value })}
-                                        placeholder="388790"
-                                        className="w-full px-4 py-2 bg-input border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm text-muted-foreground mb-1">Cover Image URL</label>
-                                    <input
-                                        type="url"
-                                        value={newGame.cover_image_url}
-                                        onChange={(e) => setNewGame({ ...newGame, cover_image_url: e.target.value })}
-                                        placeholder="https://cf.geekdo-images.com/..."
-                                        className="w-full px-4 py-2 bg-input border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                    />
-                                </div>
-                            </div>
-                            <div className="flex gap-3">
-                                <button
-                                    type="submit"
-                                    className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90"
+            {/* Upload Form */}
+            {showUploadForm && (
+                <div className="bg-card border border-border rounded-xl p-6">
+                    <h2 className="text-lg font-semibold mb-4">Upload Rulebook PDF</h2>
+                    <form onSubmit={handleUpload} className="space-y-4">
+                        <div className="grid grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-sm text-muted-foreground mb-1">Game</label>
+                                <select
+                                    value={uploadData.game_id}
+                                    onChange={(e) => setUploadData({ ...uploadData, game_id: e.target.value })}
+                                    className="w-full px-4 py-2 bg-background border border-border rounded-lg"
+                                    required
                                 >
-                                    Create Game
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowGameForm(false)}
-                                    className="px-6 py-2 bg-muted text-muted-foreground rounded-lg hover:opacity-90"
+                                    <option value="">Select game...</option>
+                                    {games.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm text-muted-foreground mb-1">Edition</label>
+                                <input
+                                    type="text"
+                                    value={uploadData.edition}
+                                    onChange={(e) => setUploadData({ ...uploadData, edition: e.target.value })}
+                                    className="w-full px-4 py-2 bg-background border border-border rounded-lg"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-muted-foreground mb-1">Type</label>
+                                <select
+                                    value={uploadData.source_type}
+                                    onChange={(e) => setUploadData({ ...uploadData, source_type: e.target.value })}
+                                    className="w-full px-4 py-2 bg-background border border-border rounded-lg"
                                 >
-                                    Cancel
-                                </button>
+                                    <option value="rulebook">Rulebook</option>
+                                    <option value="faq">FAQ</option>
+                                    <option value="errata">Errata</option>
+                                </select>
                             </div>
-                        </form>
-                    </div>
-                )}
+                        </div>
 
-                {/* Upload PDF Form */}
-                {showUploadForm && (
-                    <div className="bg-card border border-border rounded-xl p-6 mb-6">
-                        <h2 className="text-xl font-semibold mb-4">Upload Rulebook PDF</h2>
-                        <form onSubmit={handleUpload} className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
+                        {/* File Drop */}
+                        <div
+                            className={`border-2 border-dashed rounded-xl p-8 text-center ${uploadFile ? "border-emerald-500 bg-emerald-500/10" : "border-border"}`}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => { e.preventDefault(); setUploadFile(e.dataTransfer.files[0]); }}
+                        >
+                            {uploadFile ? (
                                 <div>
-                                    <label className="block text-sm text-muted-foreground mb-1">Game</label>
-                                    <select
-                                        value={uploadData.game_id}
-                                        onChange={(e) => setUploadData({ ...uploadData, game_id: e.target.value })}
-                                        className="w-full px-4 py-2 bg-input border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                        required
-                                    >
-                                        <option value="">Select a game...</option>
-                                        {games.map((game) => (
-                                            <option key={game.id} value={game.id}>
-                                                {game.name}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <p className="font-medium">📄 {uploadFile.name}</p>
+                                    <p className="text-sm text-muted-foreground">{(uploadFile.size / 1024 / 1024).toFixed(2)} MB</p>
                                 </div>
-                                <div>
-                                    <label className="block text-sm text-muted-foreground mb-1">Edition</label>
-                                    <input
-                                        type="text"
-                                        value={uploadData.edition}
-                                        onChange={(e) => setUploadData({ ...uploadData, edition: e.target.value })}
-                                        placeholder="1st Edition"
-                                        className="w-full px-4 py-2 bg-input border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm text-muted-foreground mb-1">Source Type</label>
-                                    <select
-                                        value={uploadData.source_type}
-                                        onChange={(e) => setUploadData({ ...uploadData, source_type: e.target.value })}
-                                        className="w-full px-4 py-2 bg-input border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                    >
-                                        <option value="rulebook">Rulebook</option>
-                                        <option value="faq">FAQ</option>
-                                        <option value="errata">Errata</option>
-                                        <option value="quickstart">Quick Start Guide</option>
-                                    </select>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        id="needs_ocr"
-                                        checked={uploadData.needs_ocr}
-                                        onChange={(e) => setUploadData({ ...uploadData, needs_ocr: e.target.checked })}
-                                        className="w-5 h-5 rounded"
-                                    />
-                                    <label htmlFor="needs_ocr" className="text-sm">
-                                        Needs OCR (scanned PDF)
-                                    </label>
-                                </div>
-                            </div>
-
-                            {/* File Drop Zone */}
-                            <div
-                                className={`border-2 border-dashed rounded-xl p-8 text-center transition ${uploadFile ? "border-primary bg-primary/10" : "border-border hover:border-muted-foreground"
-                                    }`}
-                                onDragOver={(e) => e.preventDefault()}
-                                onDrop={(e) => {
-                                    e.preventDefault();
-                                    const file = e.dataTransfer.files[0];
-                                    if (file?.type === "application/pdf") {
-                                        setUploadFile(file);
-                                    }
-                                }}
-                            >
-                                {uploadFile ? (
-                                    <div>
-                                        <p className="text-lg font-medium text-primary">📄 {uploadFile.name}</p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {(uploadFile.size / (1024 * 1024)).toFixed(2)} MB
-                                        </p>
-                                        <button
-                                            type="button"
-                                            onClick={() => setUploadFile(null)}
-                                            className="mt-2 text-sm text-destructive hover:underline"
-                                        >
-                                            Remove
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div>
-                                        <p className="text-lg text-muted-foreground">
-                                            Drag & drop PDF here, or{" "}
-                                            <label className="text-primary cursor-pointer hover:underline">
-                                                browse
-                                                <input
-                                                    type="file"
-                                                    accept=".pdf"
-                                                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                                                    className="hidden"
-                                                />
-                                            </label>
-                                        </p>
-                                        <p className="text-sm text-muted-foreground mt-1">Max 50MB</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {uploadProgress && (
-                                <div className="text-center text-sm py-2">{uploadProgress}</div>
+                            ) : (
+                                <label className="cursor-pointer">
+                                    <p>Drop PDF here or <span className="text-emerald-500">browse</span></p>
+                                    <input type="file" accept=".pdf" onChange={(e) => setUploadFile(e.target.files?.[0] || null)} className="hidden" />
+                                </label>
                             )}
+                        </div>
 
-                            <div className="flex gap-3">
-                                <button
-                                    type="submit"
-                                    disabled={!uploadFile || uploading}
-                                    className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50"
-                                >
-                                    {uploading ? "Uploading..." : "Upload & Ingest"}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowUploadForm(false);
-                                        setUploadFile(null);
-                                        setUploadProgress("");
-                                    }}
-                                    className="px-6 py-2 bg-muted text-muted-foreground rounded-lg hover:opacity-90"
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                )}
+                        {uploadProgress && <p className="text-center text-sm">{uploadProgress}</p>}
 
-                {/* Games List */}
-                <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-                    <div className="p-6 border-b border-border">
-                        <h2 className="text-xl font-semibold">Games ({games.length})</h2>
-                    </div>
-                    <div className="divide-y divide-border">
-                        {games.map((game) => (
-                            <div key={game.id}>
-                                <div
-                                    className="p-4 hover:bg-muted/50 transition cursor-pointer"
-                                    onClick={() => setSelectedGameId(selectedGameId === game.id ? null : game.id)}
-                                >
-                                    <div className="flex items-center gap-4">
-                                        {/* Game thumbnail - gradient with initial */}
-                                        <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center text-2xl font-bold text-primary">
-                                            {game.name.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div className="flex-1">
-                                            <h3 className="font-semibold">{game.name}</h3>
-                                            <p className="text-sm text-muted-foreground">/{game.slug}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-sm text-muted-foreground">
-                                                {game.sources?.length || 0} sources
-                                            </div>
-                                            {game.bgg_id && (
-                                                <a
-                                                    href={`https://boardgamegeek.com/boardgame/${game.bgg_id}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-xs text-primary hover:underline"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    BGG #{game.bgg_id}
-                                                </a>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
+                        <div className="flex gap-2">
+                            <button type="submit" disabled={!uploadFile || uploading} className="px-4 py-2 bg-emerald-500 text-white rounded-lg disabled:opacity-50">
+                                {uploading ? "Uploading..." : "Upload"}
+                            </button>
+                            <button type="button" onClick={() => { setShowUploadForm(false); setUploadFile(null); }} className="px-4 py-2 bg-muted text-muted-foreground rounded-lg">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            )}
 
-                                {/* Expanded sources view */}
-                                {selectedGameId === game.id && game.sources && game.sources.length > 0 && (
-                                    <div className="pl-20 pb-4 space-y-2">
-                                        {game.sources.map((source) => (
-                                            <SourceRow
-                                                key={source.id}
-                                                source={source}
-                                                onProcess={() => handleProcess(source.id)}
-                                                onDelete={() => handleDeleteSource(source.id)}
-                                                onLog={addLog}
-                                            />
-                                        ))}
+            {/* Games List */}
+            <div className="bg-card border border-border rounded-xl overflow-hidden">
+                <div className="p-4 border-b border-border">
+                    <h3 className="font-semibold">Games ({games.length})</h3>
+                </div>
+                <div className="divide-y divide-border">
+                    {games.map((game) => (
+                        <div key={game.id}>
+                            <div
+                                className="p-4 hover:bg-muted/50 cursor-pointer flex items-center gap-4"
+                                onClick={() => setSelectedGameId(selectedGameId === game.id ? null : game.id)}
+                            >
+                                {game.cover_image_url ? (
+                                    <img src={game.cover_image_url} alt={game.name} className="w-12 h-12 rounded-lg object-cover" />
+                                ) : (
+                                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold">
+                                        {game.name.charAt(0)}
                                     </div>
                                 )}
+                                <div className="flex-1">
+                                    <p className="font-medium">{game.name}</p>
+                                    <p className="text-sm text-muted-foreground">/{game.slug}</p>
+                                </div>
+                                <div className="text-right text-sm text-muted-foreground">
+                                    <p>{game.sources?.length || 0} sources</p>
+                                    {game.bgg_id && <p className="text-xs">BGG #{game.bgg_id}</p>}
+                                </div>
                             </div>
-                        ))}
-
-                        {games.length === 0 && (
-                            <div className="p-8 text-center text-muted-foreground">
-                                No games yet. Click &quot;Add Game&quot; to get started.
-                            </div>
-                        )}
-                    </div>
+                            {selectedGameId === game.id && game.sources && (
+                                <div className="pl-20 pb-4 space-y-2">
+                                    {game.sources.map((s) => (
+                                        <div key={s.id} className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg text-sm">
+                                            <span>📄</span>
+                                            <span className="flex-1">{s.edition} - {s.source_type}</span>
+                                            <span className={s.last_ingested_at ? "text-green-500" : "text-yellow-500"}>
+                                                {s.last_ingested_at ? "✅ Indexed" : "⏳ Pending"}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ))}
                 </div>
             </div>
-
-            {/* System Logs Panel */}
-            <div className="fixed bottom-16 left-0 right-0 bg-black/95 text-green-400 text-xs font-mono p-2 h-32 overflow-y-auto border-t border-green-500/30 z-40 shadow-lg">
-                <div className="max-w-6xl mx-auto px-6">
-                    <div className="flex justify-between items-center mb-1 sticky top-0 bg-black/50 backdrop-blur w-full">
-                        <span className="font-bold">SYSTEM LOGS</span>
-                        <button onClick={() => setLogs([])} className="text-[10px] text-gray-500 hover:text-white">CLEAR</button>
-                    </div>
-                    <div className="space-y-0.5">
-                        {logs.length === 0 && <div className="text-gray-600 italic">Ready. Logs will appear here...</div>}
-                        {logs.map((log, i) => (
-                            <div key={i} className="whitespace-pre-wrap font-mono">{log}</div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div >
+        </div>
     );
 }
 
-function SourceRow({ source, onProcess, onDelete, onLog }: { source: Source; onProcess: () => Promise<string | null>; onDelete: () => void; onLog: (msg: string) => void }) {
-    const [status, setStatus] = useState<{
-        status: string;
-        needs_ocr: boolean;
-        last_ingested_at: string | null;
-    } | null>(null);
-    const [jobId, setJobId] = useState<string | null>(null);
-    const [progress, setProgress] = useState<number>(0);
-    const [progressMessage, setProgressMessage] = useState<string>("");
-    const [processing, setProcessing] = useState(false);
-    const [deleting, setDeleting] = useState(false);
+// ============================================================================
+// Feedback Tab
+// ============================================================================
 
-    // Initial status from props, but careful not to overwrite if processing locally
+function FeedbackTab({ addLog }: { addLog: (msg: string) => void }) {
+    const [feedback, setFeedback] = useState<Array<{
+        id: number;
+        feedback_type: string;
+        user_note: string | null;
+        created_at: string;
+        question?: string;
+    }>>([]);
+    const [loading, setLoading] = useState(true);
+
     useEffect(() => {
-        // Only update if we are NOT currently processing a job we know about
-        if (!processing) {
-            setStatus({
-                status: source.last_ingested_at ? "indexed" : source.needs_ocr ? "needs_ocr" : "pending",
-                needs_ocr: source.needs_ocr,
-                last_ingested_at: source.last_ingested_at,
-            });
-        }
-    }, [source, processing]);
-
-    // Poll Job Status (if we have a job ID)
-    useEffect(() => {
-        if (!jobId) return;
-
-        const interval = setInterval(async () => {
+        async function load() {
             try {
-                const res = await fetch(`${API_BASE_URL}/ingest/${jobId}/status`);
+                const res = await fetch(`${API_BASE_URL}/admin/analytics/feedback`);
                 if (res.ok) {
                     const data = await res.json();
-                    onLog(`Job ${jobId.substring(0, 8)}... : ${data.state} ${data.pct}% - ${data.message || ''}`);
-                    setProgress(data.pct || 0);
-                    setProgressMessage(data.message || "");
-
-                    if (data.state === "ready") {
-                        onLog(`✅ Job ${jobId.substring(0, 8)}... completed successfully!`);
-                        setJobId(null);
-                        setProcessing(false);
-                        const sourceRes = await fetch(`${API_BASE_URL}/admin/sources/${source.id}/status`);
-                        if (sourceRes.ok) {
-                            setStatus(await sourceRes.json());
-                        }
-                    } else if (data.state === "failed") {
-                        onLog(`❌ Job ${jobId.substring(0, 8)}... FAILED: ${data.error || data.message || 'Unknown error'}`);
-                        setJobId(null);
-                        setProcessing(false);
-                        const sourceRes = await fetch(`${API_BASE_URL}/admin/sources/${source.id}/status`);
-                        if (sourceRes.ok) {
-                            setStatus(await sourceRes.json());
-                        }
-                    }
-                } else {
-                    onLog(`⚠️ Job poll returned ${res.status}`);
+                    setFeedback(data.items || []);
                 }
             } catch (e) {
-                onLog(`❌ Job poll error: ${e}`);
+                addLog(`Failed to fetch feedback: ${e}`);
+            } finally {
+                setLoading(false);
             }
-        }, 2000); // Poll every 2 seconds
+        }
+        load();
+    }, [addLog]);
 
-        return () => clearInterval(interval);
-    }, [jobId, source.id, onLog]);
+    const stats = {
+        helpful: feedback.filter(f => f.feedback_type === "helpful").length,
+        wrong_quote: feedback.filter(f => f.feedback_type === "wrong_quote").length,
+        wrong_interpretation: feedback.filter(f => f.feedback_type === "wrong_interpretation").length,
+        other: feedback.filter(f => !["helpful", "wrong_quote", "wrong_interpretation"].includes(f.feedback_type)).length,
+    };
 
-    // Poll Source Status (fallback) - kept but slower
-    useEffect(() => {
-        if (jobId || !status || status.status === "indexed") return;
-        if (status.status !== "pending" && !processing) return;
+    if (loading) {
+        return <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+    }
 
-        const interval = setInterval(async () => {
-            try {
-                const res = await fetch(`${API_BASE_URL}/admin/sources/${source.id}/status`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (!processing) setStatus(data);
+    return (
+        <div className="space-y-6">
+            {/* Feedback Stats */}
+            <div className="grid grid-cols-4 gap-4">
+                <div className="bg-card border border-border rounded-xl p-4 text-center">
+                    <ThumbsUp className="h-6 w-6 text-green-500 mx-auto mb-2" />
+                    <p className="text-2xl font-bold">{stats.helpful}</p>
+                    <p className="text-sm text-muted-foreground">Helpful</p>
+                </div>
+                <div className="bg-card border border-border rounded-xl p-4 text-center">
+                    <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-2" />
+                    <p className="text-2xl font-bold">{stats.wrong_quote}</p>
+                    <p className="text-sm text-muted-foreground">Wrong Quote</p>
+                </div>
+                <div className="bg-card border border-border rounded-xl p-4 text-center">
+                    <AlertCircle className="h-6 w-6 text-orange-500 mx-auto mb-2" />
+                    <p className="text-2xl font-bold">{stats.wrong_interpretation}</p>
+                    <p className="text-sm text-muted-foreground">Wrong Interpretation</p>
+                </div>
+                <div className="bg-card border border-border rounded-xl p-4 text-center">
+                    <MessageSquare className="h-6 w-6 text-blue-500 mx-auto mb-2" />
+                    <p className="text-2xl font-bold">{stats.other}</p>
+                    <p className="text-sm text-muted-foreground">Other</p>
+                </div>
+            </div>
 
-                    if (data.status === "indexed") {
-                        setProcessing(false);
-                        clearInterval(interval);
-                    }
-                }
-            } catch (e) { }
-        }, 5000);
-        return () => clearInterval(interval);
-    }, [source.id, status, jobId, processing]);
+            {/* Feedback List */}
+            <div className="bg-card border border-border rounded-xl overflow-hidden">
+                <div className="p-4 border-b border-border">
+                    <h3 className="font-semibold">Recent Feedback ({feedback.length})</h3>
+                </div>
+                <div className="divide-y divide-border max-h-96 overflow-y-auto">
+                    {feedback.length === 0 ? (
+                        <div className="p-8 text-center text-muted-foreground">
+                            No feedback received yet
+                        </div>
+                    ) : (
+                        feedback.slice(0, 50).map((f) => (
+                            <div key={f.id} className="p-4">
+                                <div className="flex items-center gap-2 mb-1">
+                                    {f.feedback_type === "helpful" ? (
+                                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                    ) : (
+                                        <AlertCircle className="h-4 w-4 text-red-500" />
+                                    )}
+                                    <span className="text-sm font-medium capitalize">{f.feedback_type.replace("_", " ")}</span>
+                                    <span className="text-xs text-muted-foreground ml-auto">
+                                        {new Date(f.created_at).toLocaleString()}
+                                    </span>
+                                </div>
+                                {f.user_note && (
+                                    <p className="text-sm text-muted-foreground ml-6">{f.user_note}</p>
+                                )}
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
 
-    const handleStartProcess = async () => {
-        setProcessing(true);
-        onLog(`🚀 Starting ingestion for source ${source.id} (${source.edition})...`);
+// ============================================================================
+// Maintenance Tab
+// ============================================================================
+
+function MaintenanceTab({
+    addLog,
+    onRefresh
+}: {
+    addLog: (msg: string) => void;
+    onRefresh: () => void;
+}) {
+    const [syncing, setSyncing] = useState(false);
+
+    const handleSyncImages = async () => {
+        setSyncing(true);
+        addLog("🔄 Syncing game images from BGG...");
         try {
-            const newJobId = await onProcess();
-            if (newJobId) {
-                onLog(`📋 Got job ID: ${newJobId}`);
-                setJobId(newJobId);
-            } else {
-                onLog(`❌ No job ID returned - check backend logs`);
-                setProcessing(false);
+            const res = await fetch(`${API_BASE_URL}/admin/maintenance/sync-bgg-images`, { method: "POST" });
+            const data = await res.json();
+            addLog(`✅ Synced ${data.updated} games with BGG images`);
+            if (data.errors > 0) {
+                addLog(`⚠️ ${data.errors} games had errors`);
+                data.error_details?.forEach((e: { game: string; error: string }) => {
+                    addLog(`   - ${e.game}: ${e.error}`);
+                });
             }
+            onRefresh();
         } catch (e) {
-            onLog(`❌ Error starting process: ${e}`);
-            setProcessing(false);
+            addLog(`❌ Sync failed: ${e}`);
+        } finally {
+            setSyncing(false);
         }
     };
 
-    const handleDelete = async () => {
-        if (!confirm("Are you sure you want to delete this source?")) return;
-        setDeleting(true);
-        await onDelete();
-        setDeleting(false);
+    const handleCheckOCR = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/admin/maintenance/ocr-status`);
+            const data = await res.json();
+            if (data.ocr_available) {
+                addLog(`✅ Cloud OCR: AVAILABLE`);
+            } else {
+                addLog(`❌ Cloud OCR: NOT AVAILABLE - ${data.details?.error || 'Unknown'}`);
+            }
+        } catch (e) {
+            addLog(`❌ OCR check failed: ${e}`);
+        }
     };
 
-    const displayStatus = () => {
-        if (jobId) return (
-            <span className="text-blue-500 animate-pulse text-xs font-mono ml-2">
-                {progress}% {progressMessage && `- ${progressMessage.substring(0, 20)}...`}
-            </span>
-        );
-
-        if (processing && !jobId) return <span className="text-blue-500 animate-pulse">🔄 Requesting...</span>;
-
-        if (!status) return <span className="text-muted-foreground">...</span>;
-
-        if (status.status === "indexed") return <span className="text-green-500">✅ Indexed</span>;
-        if (status.status === "needs_ocr") return <span className="text-orange-500">📄 Needs OCR</span>;
-        if (status.status === "pending") return <span className="text-yellow-500 animate-pulse">⏳ Queued...</span>;
-        return <span className="text-muted-foreground">{status.status}</span>;
+    const handleCheckFailedJobs = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/admin/maintenance/failed-jobs`);
+            const data = await res.json();
+            addLog(`📋 Failed jobs: ${data.failed_count}`);
+            data.jobs?.forEach((job: { job_id: string; exc_info?: string }) => {
+                addLog(`   ❌ ${job.job_id}: ${job.exc_info?.substring(0, 100) || 'Unknown error'}`);
+            });
+        } catch (e) {
+            addLog(`❌ Failed to check jobs: ${e}`);
+        }
     };
 
     return (
-        <div className="flex items-center gap-3 text-sm p-2 bg-muted/30 rounded-lg group">
-            <span className="text-muted-foreground">📄</span>
-            <span className="flex-1 font-medium">
-                {source.edition} - {source.source_type}
-            </span>
-
-            <div className="flex items-center gap-3">
-                {displayStatus()}
-
-                {status?.needs_ocr && !processing && (
-                    <span className="text-xs bg-orange-500/20 text-orange-500 px-2 py-0.5 rounded border border-orange-500/30">
-                        OCR Required
-                    </span>
-                )}
-
-                {(!status?.last_ingested_at) && !jobId && (
+        <div className="space-y-6">
+            {/* Maintenance Actions */}
+            <div className="bg-card border border-border rounded-xl p-6">
+                <h3 className="font-semibold mb-4">Maintenance Actions</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <button
-                        onClick={handleStartProcess}
-                        disabled={processing || status?.status === "pending"}
-                        className="px-3 py-1 bg-primary text-primary-foreground text-xs rounded hover:opacity-90 disabled:opacity-50 transition"
+                        onClick={handleSyncImages}
+                        disabled={syncing}
+                        className="p-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-center transition disabled:opacity-50"
                     >
-                        {processing ? "Starting..." : "Process Now"}
+                        {syncing ? <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" /> : <Image className="h-6 w-6 text-emerald-500 mx-auto mb-2" />}
+                        <p className="text-sm font-medium">Sync BGG Images</p>
+                        <p className="text-xs text-muted-foreground">Fetch from BoardGameGeek</p>
                     </button>
-                )}
 
-                <button
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="p-1.5 text-red-500 hover:bg-red-500/10 rounded transition opacity-0 group-hover:opacity-100"
-                    title="Delete source"
-                >
-                    {deleting ? "..." : "🗑️"}
-                </button>
+                    <button
+                        onClick={handleCheckOCR}
+                        className="p-4 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-xl text-center transition"
+                    >
+                        <Database className="h-6 w-6 text-purple-500 mx-auto mb-2" />
+                        <p className="text-sm font-medium">Check OCR Status</p>
+                        <p className="text-xs text-muted-foreground">Verify cloud OCR</p>
+                    </button>
+
+                    <button
+                        onClick={handleCheckFailedJobs}
+                        className="p-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl text-center transition"
+                    >
+                        <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-2" />
+                        <p className="text-sm font-medium">Failed Jobs</p>
+                        <p className="text-xs text-muted-foreground">View processing errors</p>
+                    </button>
+
+                    <button
+                        onClick={onRefresh}
+                        className="p-4 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-xl text-center transition"
+                    >
+                        <RefreshCw className="h-6 w-6 text-blue-500 mx-auto mb-2" />
+                        <p className="text-sm font-medium">Refresh Data</p>
+                        <p className="text-xs text-muted-foreground">Reload all games</p>
+                    </button>
+                </div>
+            </div>
+
+            {/* System Info */}
+            <div className="bg-card border border-border rounded-xl p-6">
+                <h3 className="font-semibold mb-4">System Information</h3>
+                <div className="space-y-2 text-sm">
+                    <div className="flex justify-between py-2 border-b border-border">
+                        <span className="text-muted-foreground">Backend API</span>
+                        <span className="font-mono">{API_BASE_URL}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-border">
+                        <span className="text-muted-foreground">Frontend</span>
+                        <span className="font-mono">arbiter-sage.vercel.app</span>
+                    </div>
+                    <div className="flex justify-between py-2">
+                        <span className="text-muted-foreground">Database</span>
+                        <span className="font-mono">Supabase PostgreSQL</span>
+                    </div>
+                </div>
             </div>
         </div>
     );
