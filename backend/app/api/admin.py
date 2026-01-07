@@ -393,34 +393,97 @@ async def get_image_urls():
 
 
 
+@router.post("/maintenance/sync-bgg-images")
+async def sync_bgg_images():
+    """Fetch and update game images from BoardGameGeek API.
+    
+    This endpoint:
+    1. Gets all games with bgg_id set
+    2. Fetches image URLs from BGG XML API
+    3. Updates the database with the fetched URLs
+    """
+    import httpx
+    import xml.etree.ElementTree as ET
+    from app.db.connection import get_async_connection
+    
+    results = []
+    errors = []
+    
+    async with get_async_connection() as conn:
+        async with conn.cursor() as cur:
+            # Get all games with bgg_id
+            await cur.execute("SELECT id, name, bgg_id FROM games WHERE bgg_id IS NOT NULL")
+            rows = await cur.fetchall()
+            
+            logger.info(f"Found {len(rows)} games with BGG IDs")
+            
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                for row in rows:
+                    game_id, name, bgg_id = row["id"], row["name"], row["bgg_id"]
+                    
+                    try:
+                        # Fetch from BGG API
+                        bgg_url = f"https://boardgamegeek.com/xmlapi2/thing?id={bgg_id}"
+                        response = await client.get(bgg_url)
+                        
+                        if response.status_code != 200:
+                            errors.append({"game": name, "error": f"BGG returned {response.status_code}"})
+                            continue
+                        
+                        # Parse XML
+                        root = ET.fromstring(response.content)
+                        image_elem = root.find(".//image")
+                        thumbnail_elem = root.find(".//thumbnail")
+                        
+                        # Prefer thumbnail for smaller size, fallback to full image
+                        image_url = None
+                        if thumbnail_elem is not None and thumbnail_elem.text:
+                            image_url = thumbnail_elem.text
+                        elif image_elem is not None and image_elem.text:
+                            image_url = image_elem.text
+                        
+                        if not image_url:
+                            errors.append({"game": name, "error": "No image found in BGG response"})
+                            continue
+                        
+                        # Update database
+                        await cur.execute(
+                            "UPDATE games SET cover_image_url = %s WHERE id = %s",
+                            (image_url, game_id)
+                        )
+                        
+                        results.append({
+                            "game": name,
+                            "bgg_id": bgg_id,
+                            "image_url": image_url[:60] + "..." if len(image_url) > 60 else image_url
+                        })
+                        
+                        logger.info(f"Updated {name} with image from BGG")
+                        
+                    except ET.ParseError as e:
+                        errors.append({"game": name, "error": f"XML parse error: {str(e)}"})
+                    except Exception as e:
+                        errors.append({"game": name, "error": str(e)})
+                
+            await conn.commit()
+    
+    return {
+        "success": True,
+        "updated": len(results),
+        "errors": len(errors),
+        "results": results,
+        "error_details": errors
+    }
+
+
 @router.post("/maintenance/reset-images")
 async def reset_game_images():
     """Reset images to working BGG thumbnail images.
     
-    Uses the official BGG CDN thumbnail URLs which work without hotlink issues.
+    This calls sync-bgg-images to fetch real images from BGG API.
     """
-    # BGG thumbnail URLs (these work without hotlinking blocks)
-    bgg_images = {
-        "Root": "https://cf.geekdo-images.com/JUAUWaVUzeBgzirhZNmHHw__thumb/img/sQgKnjDLal2EfhpDpNM6hA39e1Q=/fit-in/200x150/filters:strip_icc()/pic4254509.jpg",
-        "Wingspan": "https://cf.geekdo-images.com/yLZJCVLlIx4c7eJEWUNJ7w__thumb/img/VNToqgS2-pOGU6MuvIkMPKn_y-s=/fit-in/200x150/filters:strip_icc()/pic4458123.jpg",
-        "Catan": "https://cf.geekdo-images.com/W3Bsga_uLP9kO91gZ7H8yw__thumb/img/8a9HeqFydO7Uun_le9bXWPnidcA=/fit-in/200x150/filters:strip_icc()/pic2419375.jpg",
-        "Terraforming Mars": "https://cf.geekdo-images.com/wg9oOLcsKvDesSUdZQ4rxw__thumb/img/BTxqxgYay5tHJSoKb_wtPHCjL1U=/fit-in/200x150/filters:strip_icc()/pic3536616.jpg",
-        "Splendor": "https://cf.geekdo-images.com/rwOMxx4q5yuElIvo-1-OFw__thumb/img/LH_sLfPetmCI5pLt3DP4Qk09pDM=/fit-in/200x150/filters:strip_icc()/pic1904079.jpg",
-        "Lord of the Rings: Fate of the Fellowship": "https://cf.geekdo-images.com/vnPbLaT6yOt9m3mEQ7mFGQ__thumb/img/G8DT-JBZoaREdDKJslfI7kKWCDQ=/fit-in/200x150/filters:strip_icc()/pic6126059.jpg",
-        "Ticket to Ride": "https://cf.geekdo-images.com/ZWJg0dCdrWHxVnc0eFXK8w__thumb/img/a6vGzLkFjSwOZzDDxEcwDh3WCVI=/fit-in/200x150/filters:strip_icc()/pic38668.jpg",
-    }
-    
-    count = 0
-    from app.db.connection import get_async_connection
-    async with get_async_connection() as conn:
-        async with conn.cursor() as cur:
-            for name, url in bgg_images.items():
-                await cur.execute("UPDATE games SET cover_image_url = %s WHERE name = %s", (url, name))
-                if cur.rowcount > 0:
-                    count += 1
-            await conn.commit()
-            
-    return {"success": True, "message": f"Updated {count} games with BGG thumbnail images"}
+    # Just redirect to the sync endpoint
+    return await sync_bgg_images()
 
 
 @router.get("/maintenance/failed-jobs")
