@@ -4,6 +4,9 @@ Admin API endpoints for content management and analytics.
 
 import logging
 from typing import Any
+import shutil
+import os
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request, Body
 from supabase import create_client, Client
@@ -393,16 +396,61 @@ async def get_image_urls():
 
 
 
-@router.post("/maintenance/sync-bgg-images")
-async def sync_bgg_images():
-    """Fetch and update game images from BoardGameGeek API.
+@router.post("/games/{game_id}/image")
+async def upload_game_image(
+    game_id: int,
+    file: UploadFile = File(...),
+    alt_text: str | None = Form(None),
+    games_repo: GamesRepository = Depends(get_games_repo),
+):
+    """Upload a game image to local static storage."""
     
-    This endpoint:
-    1. Gets all games with bgg_id set
-    2. Fetches image URLs from BGG XML API (concurrently with rate limiting)
-    3. Updates the database with the fetched URLs
-    """
-    import httpx
+    # 1. Validate File
+    if file.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
+        raise HTTPException(400, "Only JPEG/PNG Allowed.")
+    
+    # 2. Get Game
+    game = await games_repo.get_game(game_id)
+    if not game:
+        raise HTTPException(404, "Game not found")
+
+    # 3. Create Directory
+    static_images_dir = Path("app/static/images/games")
+    static_images_dir.mkdir(parents=True, exist_ok=True)
+    
+    # 4. Generate Filename
+    safe_name = game.slug if game.slug else f"game-{game_id}"
+    ext = ".jpg" if "jpeg" in file.content_type or "jpg" in file.content_type else ".png"
+    filename = f"{safe_name}{ext}"
+    file_path = static_images_dir / filename
+    
+    # 5. Save File
+    try:
+        with file_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        logger.error(f"Failed to save image: {e}")
+        raise HTTPException(500, "Failed to save file")
+        
+    # 6. Update DB
+    from app.db.models import GameCreate
+    
+    updated_game_data = GameCreate(
+        name=game.name,
+        slug=game.slug,
+        bgg_id=game.bgg_id,
+        cover_image_url=None, 
+        image_filename=filename,
+        image_alt_text=alt_text or f"Cover for {game.name}"
+    )
+    
+    await games_repo.update_game(game_id, updated_game_data)
+    
+    return {"success": True, "filename": filename}
+
+"""
+Legacy BGG Logic:
+
     import asyncio
     import xml.etree.ElementTree as ET
     from app.db.connection import get_async_connection
@@ -526,38 +574,10 @@ async def sync_bgg_images():
         "results": results,
         "error_details": errors
     }
+"""
 
 
-@router.post("/maintenance/update-game-image")
-async def update_game_image(
-    data: dict = Body(...)
-):
-    """Update a single game's cover image (called from frontend sync)."""
-    game_id = data.get("game_id")
-    image_url = data.get("image_url")
-    
-    if not game_id or not image_url:
-        raise HTTPException(status_code=400, detail="Missing game_id or image_url")
 
-    from app.db.connection import get_async_connection
-    async with get_async_connection() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                "UPDATE games SET cover_image_url = %s WHERE id = %s",
-                (image_url, game_id)
-            )
-            await conn.commit()
-    return {"success": True}
-
-
-@router.post("/maintenance/reset-images")
-async def reset_game_images():
-    """Reset images to working BGG thumbnail images.
-    
-    This calls sync-bgg-images to fetch real images from BGG API.
-    """
-    # Just redirect to the sync endpoint
-    return await sync_bgg_images()
 
 
 @router.get("/maintenance/failed-jobs")
@@ -589,62 +609,7 @@ async def get_failed_jobs():
     }
 
 
-@router.get("/proxy/image/{bgg_id}")
-async def proxy_bgg_image(bgg_id: int):
-    """Proxy BGG images to avoid hotlinking issues.
-    
-    This fetches the image from BGG's CDN and serves it.
-    BGG blocks direct hotlinking but allows server-to-server requests.
-    """
-    import httpx
-    from fastapi.responses import Response
-    
-    # Construct BGG image URL
-    # BGG image format: https://cf.geekdo-images.com/pic{id}.jpg (small thumb)
-    # For better quality, we'd need the full URL with hash, but this works for thumbnails
-    bgg_url = f"https://boardgamegeek.com/xmlapi2/thing?id={bgg_id}&stats=1"
-    
-    try:
-        async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as client:
-            # First, get the game info to find the image URL
-            response = await client.get(bgg_url)
-            if response.status_code != 200:
-                # Return placeholder if BGG request fails
-                return Response(
-                    content=b"",
-                    media_type="image/png",
-                    status_code=404
-                )
-            
-            # Parse XML to get image URL
-            import xml.etree.ElementTree as ET
-            root = ET.fromstring(response.content)
-            image_elem = root.find(".//image")
-            
-            if image_elem is None or not image_elem.text:
-                return Response(content=b"", media_type="image/png", status_code=404)
-            
-            image_url = image_elem.text
-            
-            # Fetch the actual image
-            img_response = await client.get(image_url, headers={
-                "User-Agent": "TheArbiter/1.0 (Board Game Rules)",
-                "Accept": "image/*"
-            })
-            
-            if img_response.status_code == 200:
-                content_type = img_response.headers.get("content-type", "image/jpeg")
-                return Response(
-                    content=img_response.content,
-                    media_type=content_type,
-                    headers={"Cache-Control": "public, max-age=86400"}  # Cache for 1 day
-                )
-            
-    except Exception as e:
-        logger.error(f"BGG image proxy error for {bgg_id}: {e}")
-    
-    # Return 404 if anything fails
-    return Response(content=b"", media_type="image/png", status_code=404)
+
 
 
 @router.get("/maintenance/ocr-status")

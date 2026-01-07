@@ -41,6 +41,8 @@ class GameBase(BaseDBModel):
     slug: str
     bgg_id: int | None = None
     cover_image_url: str | None = None
+    image_filename: str | None = None
+    image_alt_text: str | None = None
 
 
 class GameCreate(GameBase):

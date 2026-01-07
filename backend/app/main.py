@@ -46,6 +46,13 @@ def create_app() -> FastAPI:
     app.include_router(analytics_router)
     app.include_router(admin_router)
     
+    # Mount Static Files (for images)
+    from fastapi.staticfiles import StaticFiles
+    static_dir = os.path.join(os.path.dirname(__file__), "static")
+    if not os.path.exists(static_dir):
+        os.makedirs(static_dir)
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    
     return app
 
 

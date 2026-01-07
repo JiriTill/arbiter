@@ -31,6 +31,8 @@ interface Game {
     slug: string;
     bgg_id: number | null;
     cover_image_url: string | null;
+    image_filename: string | null;
+    image_alt_text: string | null;
     sources?: Source[];
 }
 
@@ -411,6 +413,11 @@ function GamesTab({
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState("");
 
+    // Image Upload State
+    const [imageUploadGameId, setImageUploadGameId] = useState<number | null>(null);
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imageUploading, setImageUploading] = useState(false);
+
     const generateSlug = (name: string) => {
         return name.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").trim();
     };
@@ -471,6 +478,37 @@ function GamesTab({
             setUploading(false);
         }
     };
+
+    const handleImageUpload = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!imageFile || !imageUploadGameId) return;
+
+        setImageUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append("file", imageFile);
+
+            const res = await fetch(`${API_BASE_URL}/admin/games/${imageUploadGameId}/image`, {
+                method: "POST",
+                body: formData
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || "Upload failed");
+            }
+
+            addLog(`✅ Image uploaded for Game ID ${imageUploadGameId}`);
+            setImageUploadGameId(null);
+            setImageFile(null);
+            onRefresh();
+        } catch (err) {
+            addLog(`❌ Image upload failed: ${err}`);
+        } finally {
+            setImageUploading(false);
+        }
+    };
+
 
     return (
         <div className="space-y-6">
@@ -597,6 +635,36 @@ function GamesTab({
                 </div>
             )}
 
+            {/* Image Upload Modal */}
+            {imageUploadGameId && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-card p-6 rounded-xl w-96 border border-border shadow-xl">
+                        <h3 className="text-lg font-bold mb-4">Upload Cover Image</h3>
+                        <form onSubmit={handleImageUpload} className="space-y-4">
+                            <div className="border border-dashed border-border p-4 rounded-lg bg-muted/50 text-center">
+                                {imageFile ? (
+                                    <p className="text-sm font-medium">{imageFile.name}</p>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">Select JPG or PNG (Max 2MB)</p>
+                                )}
+                            </div>
+                            <input
+                                type="file"
+                                accept="image/png, image/jpeg"
+                                onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                                className="w-full text-sm"
+                            />
+                            <div className="flex justify-end gap-2">
+                                <button type="button" onClick={() => setImageUploadGameId(null)} className="px-3 py-2 bg-muted rounded-lg text-sm">Cancel</button>
+                                <button type="submit" disabled={!imageFile || imageUploading} className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm disabled:opacity-50">
+                                    {imageUploading ? "Uploading..." : "Upload"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             {/* Games List */}
             <div className="bg-card border border-border rounded-xl overflow-hidden">
                 <div className="p-4 border-b border-border">
@@ -609,7 +677,9 @@ function GamesTab({
                                 className="p-4 hover:bg-muted/50 cursor-pointer flex items-center gap-4"
                                 onClick={() => setSelectedGameId(selectedGameId === game.id ? null : game.id)}
                             >
-                                {game.cover_image_url ? (
+                                {game.image_filename ? (
+                                    <img src={`${API_BASE_URL}/static/images/games/${game.image_filename}`} alt={game.name} className="w-12 h-12 rounded-lg object-cover" />
+                                ) : game.cover_image_url ? (
                                     <img src={game.cover_image_url} alt={game.name} className="w-12 h-12 rounded-lg object-cover" />
                                 ) : (
                                     <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold">
@@ -620,9 +690,14 @@ function GamesTab({
                                     <p className="font-medium">{game.name}</p>
                                     <p className="text-sm text-muted-foreground">/{game.slug}</p>
                                 </div>
-                                <div className="text-right text-sm text-muted-foreground">
+                                <div className="text-right text-sm text-muted-foreground flex flex-col items-end gap-1">
                                     <p>{game.sources?.length || 0} sources</p>
-                                    {game.bgg_id && <p className="text-xs">BGG #{game.bgg_id}</p>}
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setImageUploadGameId(game.id); }}
+                                        className="text-xs text-blue-500 hover:text-blue-400 flex items-center gap-1 bg-blue-500/10 px-2 py-1 rounded-md transition-colors"
+                                    >
+                                        <Image className="h-3 w-3" /> Upload Cover
+                                    </button>
                                 </div>
                             </div>
                             {selectedGameId === game.id && game.sources && (
@@ -826,9 +901,9 @@ function MaintenanceTab({
     addLog: (msg: string) => void;
     onRefresh: () => void;
 }) {
-    const [syncing, setSyncing] = useState(false);
+    // const [syncing, setSyncing] = useState(false);
 
-    const handleSyncImages = async () => {
+    /* const handleSyncImages = async () => {
         setSyncing(true);
         addLog("🔄 Syncing game images via Proxy (Client-side)...");
         try {
@@ -974,7 +1049,7 @@ function MaintenanceTab({
                 }
             };
         };
-    };
+    }; */
 
     const handleCheckOCR = async () => {
         try {
@@ -1009,15 +1084,7 @@ function MaintenanceTab({
             <div className="bg-card border border-border rounded-xl p-6">
                 <h3 className="font-semibold mb-4">Maintenance Actions</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <button
-                        onClick={handleSyncImages}
-                        disabled={syncing}
-                        className="p-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-center transition disabled:opacity-50"
-                    >
-                        {syncing ? <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" /> : <Image className="h-6 w-6 text-emerald-500 mx-auto mb-2" />}
-                        <p className="text-sm font-medium">Sync BGG Images</p>
-                        <p className="text-xs text-muted-foreground">Fetch from BoardGameGeek</p>
-                    </button>
+
 
                     <button
                         onClick={handleCheckOCR}

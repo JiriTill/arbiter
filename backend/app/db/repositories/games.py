@@ -82,8 +82,8 @@ class GamesRepository(BaseRepository[Game, GameCreate]):
             Created Game with ID
         """
         query = """
-            INSERT INTO games (name, slug, bgg_id, cover_image_url)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO games (name, slug, bgg_id, cover_image_url, image_filename, image_alt_text)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING *
         """
         async with self._get_cursor() as cur:
@@ -92,16 +92,18 @@ class GamesRepository(BaseRepository[Game, GameCreate]):
                 game.slug,
                 game.bgg_id,
                 game.cover_image_url,
+                game.image_filename,
+                game.image_alt_text,
             ))
             row = await cur.fetchone()
             await self.conn.commit()
             return Game.model_validate(row)
-    
+
     async def update_game(self, game_id: int, game: GameCreate) -> Game | None:
         """Update an existing game."""
         query = """
             UPDATE games
-            SET name = %s, slug = %s, bgg_id = %s, cover_image_url = %s, updated_at = NOW()
+            SET name = %s, slug = %s, bgg_id = %s, cover_image_url = %s, image_filename = %s, image_alt_text = %s, updated_at = NOW()
             WHERE id = %s
             RETURNING *
         """
@@ -111,6 +113,8 @@ class GamesRepository(BaseRepository[Game, GameCreate]):
                 game.slug,
                 game.bgg_id,
                 game.cover_image_url,
+                game.image_filename,
+                game.image_alt_text,
                 game_id,
             ))
             row = await cur.fetchone()
@@ -118,7 +122,7 @@ class GamesRepository(BaseRepository[Game, GameCreate]):
             if row:
                 return Game.model_validate(row)
             return None
-    
+
     async def get_game_with_sources(self, game_id: int) -> GameWithSources | None:
         """Get a game with all its sources and expansions."""
         game = await self.get_game(game_id)
@@ -137,13 +141,13 @@ class GamesRepository(BaseRepository[Game, GameCreate]):
             await cur.execute(sources_query, (game_id,))
             source_rows = await cur.fetchall()
         
-        from app.db.models import GameSource
+        from app.db.models import GameSource, Expansion
         return GameWithSources(
             **game.model_dump(),
             expansions=[Expansion.model_validate(r) for r in expansion_rows],
             sources=[GameSource.model_validate(r) for r in source_rows],
         )
-    
+
     async def list_games_with_sources(
         self,
         limit: int = 100,
@@ -177,28 +181,23 @@ class GamesRepository(BaseRepository[Game, GameCreate]):
             GameWithSources(
                 **g.model_dump(),
                 sources=sources_map[g.id],
-                expansions=[] # Expansions not populated for list view
+                expansions=[]
             )
             for g in games
         ]
 
-    # ========================================================================
-    # Sync Methods (for background jobs)
-    # ========================================================================
-    
+    # Sync Methods
     def list_games_sync(self, limit: int = 100, offset: int = 0) -> list[Game]:
-        """List games (sync version)."""
         return self.list_sync(limit, offset, order_by="name")
-    
+        
     def get_game_sync(self, game_id: int) -> Game | None:
-        """Get a game by ID (sync version)."""
         return self.get_by_id_sync(game_id)
-    
+
     def create_game_sync(self, game: GameCreate) -> Game:
         """Create a game (sync version)."""
         query = """
-            INSERT INTO games (name, slug, bgg_id, cover_image_url)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO games (name, slug, bgg_id, cover_image_url, image_filename, image_alt_text)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING *
         """
         with self._get_cursor() as cur:
@@ -207,6 +206,8 @@ class GamesRepository(BaseRepository[Game, GameCreate]):
                 game.slug,
                 game.bgg_id,
                 game.cover_image_url,
+                game.image_filename,
+                game.image_alt_text,
             ))
             row = cur.fetchone()
             self.conn.commit()

@@ -115,6 +115,8 @@ export interface Game {
     slug: string;
     bgg_id: number | null;
     cover_image_url: string | null;
+    image_filename?: string | null;
+    image_alt_text?: string | null;
     editions: string[];
     has_indexed_sources: boolean;
     expansions?: Expansion[];

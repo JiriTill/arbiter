@@ -5,6 +5,8 @@ import { Search, X, Gamepad2, AlertTriangle, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Game } from "@/types/arbiter";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 interface GameSelectorProps {
     selectedGame: Game | null;
     onSelect: (game: Game | null) => void;
@@ -33,6 +35,11 @@ export function GameSelector({ selectedGame, onSelect, games = [], className }: 
     const [highlightIndex, setHighlightIndex] = useState(-1);
     const inputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+
+    const getImageUrl = (game: Game) => {
+        if (game.image_filename) return `${API_BASE_URL}/static/images/games/${game.image_filename}`;
+        return game.cover_image_url;
+    };
 
     // Filter games based on search term
     const filteredGames = games.filter((game) =>
@@ -90,9 +97,9 @@ export function GameSelector({ selectedGame, onSelect, games = [], className }: 
             <div className={cn("relative", className)} ref={containerRef}>
                 <div className="flex items-center gap-3 rounded-xl border-2 border-emerald-500/30 bg-emerald-500/10 p-3">
                     {/* Game avatar/image */}
-                    {selectedGame.cover_image_url ? (
+                    {getImageUrl(selectedGame) ? (
                         <img
-                            src={selectedGame.cover_image_url}
+                            src={getImageUrl(selectedGame)!}
                             alt={selectedGame.name}
                             className="w-12 h-12 rounded-xl object-cover shadow-lg"
                             onError={(e) => {
@@ -104,7 +111,7 @@ export function GameSelector({ selectedGame, onSelect, games = [], className }: 
                     <div className={cn(
                         "w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center text-xl font-bold text-white shadow-lg",
                         getGameColor(selectedGame.name),
-                        selectedGame.cover_image_url && "hidden"
+                        getImageUrl(selectedGame) && "hidden"
                     )}>
                         {selectedGame.name.charAt(0).toUpperCase()}
                     </div>
@@ -190,9 +197,9 @@ export function GameSelector({ selectedGame, onSelect, games = [], className }: 
                                         )}
                                     >
                                         {/* Game avatar/image */}
-                                        {game.cover_image_url ? (
+                                        {getImageUrl(game) ? (
                                             <img
-                                                src={game.cover_image_url}
+                                                src={getImageUrl(game)!}
                                                 alt={game.name}
                                                 className="w-10 h-10 rounded-lg object-cover"
                                                 onError={(e) => {
@@ -205,7 +212,7 @@ export function GameSelector({ selectedGame, onSelect, games = [], className }: 
                                         <div className={cn(
                                             "w-10 h-10 rounded-lg bg-gradient-to-br flex items-center justify-center text-lg font-bold text-white",
                                             getGameColor(game.name),
-                                            game.cover_image_url && "hidden"
+                                            getImageUrl(game) && "hidden"
                                         )}>
                                             {game.name.charAt(0).toUpperCase()}
                                         </div>

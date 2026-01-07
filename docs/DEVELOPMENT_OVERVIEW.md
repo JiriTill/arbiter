@@ -101,7 +101,7 @@ Board game players frequently encounter rules disputes during gameplay:
 ✅ **Admin Functions** - Source management and analytics  
 ✅ **History API** - `/history` endpoint for Q&A history retrieval  
 ✅ **History Saving** - Verdicts are saved to database after each question  
-✅ **Game Images** - BGG thumbnail URLs configured for all seed games  
+✅ **Game Images** - Manual image uploads via Admin Panel (replaced BGG sync)  
 
 ### What Needs Work
 
@@ -408,7 +408,7 @@ arbiter/
 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
-| `games` | Game catalog | id, name, slug, bgg_id, cover_image_url |
+| `games` | Game catalog | id, name, slug, bgg_id, cover_image_url, image_filename |
 | `expansions` | Game expansions | id, game_id, name, code |
 | `game_sources` | Source documents | id, game_id, edition, source_type |
 | `rule_chunks` | Chunked text + embeddings | id, source_id, chunk_text, embedding |
@@ -468,6 +468,7 @@ User Question
 | `009_api_costs.sql` | API cost tracking |
 | `010_source_suggestions.sql` | Community source suggestions |
 | `011_performance_indexes.sql` | Query optimization |
+| `009_local_images.sql` | Local image storage support |
 
 ---
 
@@ -509,4 +510,21 @@ cd frontend && npm run lint && npm run build
 
 ---
 
+
+---
+
+## 📜 Archived Integrations
+
+### BoardGameGeek (BGG) Image Sync
+**Status:** Removed (January 2026)
+**Reason:** Persistent IP blocking and 403 Forbidden errors from BGG API.
+**History:**
+- Attempted direct XML API integration -> Blocked.
+- Attempted `api.allorigins.win` proxy client-side -> Blocked/Unreliable.
+- Attempted custom User-Agent headers -> Blocked.
+**Resolution:** Switched to manual image uploads via Admin Panel. Images are stored locally in `frontend/public/images/games/` (or served via backend static files).
+
+---
+
 *This document provides a comprehensive overview for developers joining the project or planning future development work.*
+
