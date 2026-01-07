@@ -5,7 +5,7 @@ Admin API endpoints for content management and analytics.
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request, Body
 from supabase import create_client, Client
 
 from app.config import get_settings
@@ -509,6 +509,28 @@ async def sync_bgg_images():
         "results": results,
         "error_details": errors
     }
+
+
+@router.post("/maintenance/update-game-image")
+async def update_game_image(
+    data: dict = Body(...)
+):
+    """Update a single game's cover image (called from frontend sync)."""
+    game_id = data.get("game_id")
+    image_url = data.get("image_url")
+    
+    if not game_id or not image_url:
+        raise HTTPException(status_code=400, detail="Missing game_id or image_url")
+
+    from app.db.connection import get_async_connection
+    async with get_async_connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "UPDATE games SET cover_image_url = %s WHERE id = %s",
+                (image_url, game_id)
+            )
+            await conn.commit()
+    return {"success": True}
 
 
 @router.post("/maintenance/reset-images")

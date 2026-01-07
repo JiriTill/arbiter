@@ -773,8 +773,8 @@ function FeedbackTab({ addLog }: { addLog: (msg: string) => void }) {
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3">
                                     <span className={`text-sm font-bold px-3 py-1 rounded-full capitalize border ${selectedItem.feedback_type === 'helpful'
-                                            ? 'bg-green-500/10 text-green-500 border-green-500/20'
-                                            : 'bg-red-500/10 text-red-500 border-red-500/20'
+                                        ? 'bg-green-500/10 text-green-500 border-green-500/20'
+                                        : 'bg-red-500/10 text-red-500 border-red-500/20'
                                         }`}>
                                         {selectedItem.feedback_type.replace("_", " ")}
                                     </span>
@@ -830,17 +830,62 @@ function MaintenanceTab({
 
     const handleSyncImages = async () => {
         setSyncing(true);
-        addLog("🔄 Syncing game images from BGG...");
+        addLog("🔄 Syncing game images from BGG (Client-side)...");
         try {
-            const res = await fetch(`${API_BASE_URL}/admin/maintenance/sync-bgg-images`, { method: "POST" });
-            const data = await res.json();
-            addLog(`✅ Synced ${data.updated} games with BGG images`);
-            if (data.errors > 0) {
-                addLog(`⚠️ ${data.errors} games had errors`);
-                data.error_details?.forEach((e: { game: string; error: string }) => {
-                    addLog(`   - ${e.game}: ${e.error}`);
-                });
+            // 1. Get List of Games
+            const gamesRes = await fetch(`${API_BASE_URL}/admin/games?limit=1000`);
+            const games = await gamesRes.json();
+            const gamesWithBgg = games.filter((g: any) => g.bgg_id);
+            addLog(`📋 Found ${gamesWithBgg.length} games to check...`);
+
+            let updated = 0;
+            let errors = 0;
+
+            // 2. Process each game
+            for (const game of gamesWithBgg) {
+                try {
+                    // Fetch from BGG
+                    const bggRes = await fetch(`https://boardgamegeek.com/xmlapi2/thing?id=${game.bgg_id}`);
+                    if (!bggRes.ok) throw new Error(`BGG status ${bggRes.status}`);
+                    const text = await bggRes.text();
+
+                    // Parse XML
+                    const parser = new DOMParser();
+                    const xml = parser.parseFromString(text, "text/xml");
+                    const thumb = xml.querySelector("thumbnail")?.textContent;
+                    const img = xml.querySelector("image")?.textContent;
+                    let finalImg = thumb || img;
+
+                    if (finalImg) {
+                        // Fix URL
+                        if (!finalImg.startsWith("http")) {
+                            if (finalImg.startsWith("//")) finalImg = "https:" + finalImg;
+                            else finalImg = "https://boardgamegeek.com" + finalImg; // unlikely
+                        }
+
+                        // Update Backend
+                        await fetch(`${API_BASE_URL}/admin/maintenance/update-game-image`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ game_id: game.id, image_url: finalImg })
+                        });
+                        updated++;
+                        // addLog(`✅ Updated ${game.name}`); // commented out to avoid log spam
+                    } else {
+                        addLog(`⚠️ No image found for ${game.name}`);
+                        errors++;
+                    }
+
+                    // Delay to be nice to BGG
+                    await new Promise(r => setTimeout(r, 600));
+
+                } catch (e) {
+                    addLog(`❌ Failed ${game.name}: ${e}`);
+                    errors++;
+                }
             }
+
+            addLog(`✅ Sync complete! Updated: ${updated}, Errors: ${errors}`);
             onRefresh();
         } catch (e) {
             addLog(`❌ Sync failed: ${e}`);
